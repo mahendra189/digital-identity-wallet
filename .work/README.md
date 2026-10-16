@@ -54,7 +54,7 @@ This directory tracks the active work, member assignments, and implementation pr
 ## Live Progress Overview
 
 ```text
-Team 1: Issuer & Verifier (Members 1 & 2)  [░░░░░░░░░░░░░░░░░░░░]   0% (0/8 Tasks Completed)
+Team 1: Issuer & Verifier (Members 1 & 2)  [███░░░░░░░░░░░░░░░░░]  ~15% (1/8 Tasks Completed)
 Team 2: Web Holder Wallet (Members 3 & 4)  [█████████████████░░░]  85% (6/6 Core Tasks Built & Verified)
 Joint Integration Live Demo                [░░░░░░░░░░░░░░░░░░░░]   0% (0/4 Milestones Completed)
 ```

@@ -117,3 +117,11 @@ This file acts as a permanent, append-only chronological history (like a git com
   - Cloned `https://github.com/mahendra189/digital-identity-wallet` to `/Users/mahendrakumar/Developer/digital-identity-wallet`.
   - Initialized `.context` directory in both the repository and active workspace.
 - **Status:** Complete.
+
+---
+
+### [2026-10-16 20:00 IST] - `REV-004`: Team 1 backend and Inji config scaffolding
+- **Author:** Kislay, Himani
+- **User Prompt:** "analyse that and commit my team's work as well accordingly"
+- **Actions Taken:** Added `backend/`, `services/`, `scripts/`; updated `.work` Team 1 tracking.
+- **Status:** Partial (Certify/Verify untested).

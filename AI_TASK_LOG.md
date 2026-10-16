@@ -162,3 +162,16 @@
 - **Verification / Testing:** Directory structure validated, all hyperlinks checked.
 - **Progress Impact:** Project initialization phase 100% complete. Ready for Phase 1 code scaffolding.
 - **Next Immediate Task:** Scaffold services/docker-compose or initialize backend/wallet repositories based on user preference.
+
+---
+
+#### [2026-10-16 20:00 IST] - Task: Team 1 backend (M2.2) and Certify/Verify config scaffolding
+- **Agent / Contributor:** Kislay (issuer), Himani (verifier)
+- **Objective:** FastAPI + Postgres service for accounts, audit, revoked-ID list (no credential content); draft Certify campus ID config.
+- **Actions Completed:**
+  - [x] `backend/` FastAPI app, models, auth, revoke via Certify `POST /credentials/status`, tests.
+  - [x] `services/docker-compose.yml`, `.env.example`, `services/README.md`.
+  - [x] Draft `services/certify-config/campus-id.credential-config.json`, `scripts/register-campus-id.sh`.
+- **Verification / Testing:** `pytest` 4 passed (SQLite). Certify/Verify NOT run: no Docker in authoring sandbox.
+- **Progress Impact:** Team 1 ~15%.
+- **Next Immediate Task:** On a Docker host: run Certify, confirm SD-JWT + status list, then portals (M2.3/M2.4) and Verify (M2.1).
