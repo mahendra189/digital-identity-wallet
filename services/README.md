@@ -12,7 +12,7 @@
 cp .env.example services/.env && cd services && docker compose --env-file .env up --build
 ```
 
-## Run Certify / Verify (upstream, UNTESTED here: no Docker in the authoring sandbox)
+## Run Certify / Verify (upstream, Not yet tested: needs a Docker host)
 1. Clone `mosip/inji-certify` and `mosip/inji-verify`; start their compose stacks.
 2. Remap host ports so Certify/Verify/verify-ui/Postgres do not clash with the table above.
 3. `scripts/register-campus-id.sh` posts `certify-config/campus-id.credential-config.json`.
