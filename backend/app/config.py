@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     certify_base_url: str = "http://localhost:8080/v1/certify"
     certify_mock: bool = True
     cors_origins: list[str] = ["http://localhost:3000", "http://localhost:3001"]
+    issuer_cert_sha256: str | None = None
     seed_admin_username: str = "admin"
     seed_admin_password: str = "admin123"
     seed_verifier_username: str = "verifier"

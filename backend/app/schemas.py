@@ -45,3 +45,20 @@ class AuditOut(BaseModel):
     actor: str
     action: str
     target: str
+
+
+class VerifyRequest(BaseModel):
+    presentation: str
+    nonce: str
+    aud: str
+
+
+class VerifyResult(BaseModel):
+    status: str
+    reasons: list[str]
+    claims: dict
+    hidden: int
+    credential_id: str | None
+    issuer: str | None
+    issuer_cert_sha256: str | None
+    registered: bool

@@ -35,3 +35,15 @@ Only start the services you need: `docker compose up -d database certify certify
 ### Open items
 - How Inji Verify validates this credential and resolves the issuer key.
 - Photo field (left out of the first version).
+
+## Present and verify (selective disclosure + revocation)
+After `issue_test_credential.py` (saves `issued_campus_id.txt` and `holder_key.pem`):
+```
+python3 scripts/present_and_verify.py present --reveal roll_number,enrollment_status --aud library-desk --nonce abc123
+python3 scripts/present_and_verify.py verify  --aud library-desk --nonce abc123 --backend http://localhost:8000
+```
+The verifier checks: issuer signature (certificate in the credential header), that every revealed field matches the
+signed hashes, holder key binding (nonce, audience, exactly the presented fields), expiry, and our revoked list.
+The same logic is exposed as `POST /api/v1/verify` for the verifier portal (needs a login token).
+Optional hardening: set `ISSUER_CERT_SHA256` (backend) or `--pin` (CLI) to the issuer certificate fingerprint printed on
+the first run; without it any self-consistent issuer certificate is accepted.

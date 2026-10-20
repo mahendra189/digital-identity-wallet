@@ -10,7 +10,10 @@ from app.db import get_session
 from app.deps import current_user, require_admin
 from app.errors import api_error
 from app.models import Account, AuditLog, CredentialRecord
-from app.schemas import AuditOut, CredentialCreate, CredentialOut, LoginRequest, RevocationStatus, TokenResponse
+from app.config import settings
+from app.schemas import (AuditOut, CredentialCreate, CredentialOut, LoginRequest, RevocationStatus, TokenResponse,
+                         VerifyRequest, VerifyResult)
+from app.sdjwt_verify import verify_presentation
 from app.security import create_token, verify_password
 
 router = APIRouter(prefix="/api/v1")
@@ -81,3 +84,16 @@ async def revocation_status(credential_id: str, _: dict = Depends(current_user),
 @router.get("/audit", response_model=list[AuditOut])
 async def audit(_: dict = Depends(require_admin), s: AsyncSession = Depends(get_session)):
     return (await s.execute(select(AuditLog).order_by(AuditLog.id.desc()).limit(200))).scalars().all()
+
+
+@router.post("/verify", response_model=VerifyResult)
+async def verify(body: VerifyRequest, user: dict = Depends(current_user), s: AsyncSession = Depends(get_session)):
+    revoked = set((await s.execute(
+        select(CredentialRecord.credential_id).where(CredentialRecord.revoked_at.is_not(None)))).scalars().all())
+    res = verify_presentation(body.presentation, expected_nonce=body.nonce, expected_aud=body.aud,
+                              revoked_ids=revoked, pin_sha256=settings.issuer_cert_sha256)
+    cid = res["credential_id"]
+    registered = bool(cid and await s.get(CredentialRecord, cid))
+    s.add(AuditLog(actor=user["sub"], action="VERIFY", target=cid or "unknown"))
+    await s.commit()
+    return VerifyResult(registered=registered, **res)
