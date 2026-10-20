@@ -4,22 +4,34 @@
 |---|---|---|
 | FastAPI | 8000 | `backend/` |
 | Postgres (app) | 5432 | `services/docker-compose.yml` |
-| Inji Certify | 8090 -> remap if clashing | upstream `inji-certify/docker-compose/docker-compose-injistack` |
-| Inji Verify | 8080 -> remap to 8081 | upstream `inji-verify/docker-compose` |
+| Inji Certify | 8090 | upstream `inji-certify` v0.14.0, `docker-compose/docker-compose-injistack` |
+| Certify Postgres / nginx | 5433 / 8091 | same compose |
 
 ## Run API + DB
 ```
 cp .env.example services/.env && cd services && docker compose --env-file .env up --build
 ```
 
-## Run Certify / Verify (upstream, Not yet tested: needs a Docker host)
-1. Clone `mosip/inji-certify` and `mosip/inji-verify`; start their compose stacks.
-2. Remap host ports so Certify/Verify/verify-ui/Postgres do not clash with the table above.
-3. `scripts/setup-certify-local.sh <upstream-compose-dir>` mounts the student data, then `scripts/register-campus-id.sh` posts `certify-config/campus-id.credential-config.json` (SD-JWT; revocation is handled by our backend, not Certify).
-4. Set `CERTIFY_MOCK=false` and `CERTIFY_BASE_URL` to use the real revoke call:
-   `POST {certify}/credentials/status` (exists in `CredentialStatusController`; body mirrors `UpdateCredentialStatusRequest`).
+## Run Certify and issue a Campus ID (tested in WSL2 + Docker Desktop)
+```
+git clone --depth 1 --branch v0.14.0 https://github.com/mosip/inji-certify.git ~/work/inji-certify
+UP=~/work/inji-certify/docker-compose/docker-compose-injistack
+bash scripts/setup-certify-local.sh $UP      # config fixes + start Certify
+bash scripts/register-campus-id.sh           # registers the SD-JWT Campus ID config
+python3 scripts/issue_test_credential.py     # issues one credential as a test wallet
+```
+Only start the services you need: `docker compose up -d database certify certify-nginx`.
 
-## Open items to verify on a Docker host
-- Certify accepts `vc+sd-jwt` here (DTO has `sdJwtVct`, `sdJwtClaims`, `sdClaim`); the documented sample is `ldp_vc`.
-- Status list entries are documented for `ldp_vc` with the W3C v2 context; confirm they are added to SD-JWT VCs.
-- How Verify consumes the presentation and surfaces "Revoked".
+### Keep in mind
+- Certify's signing key file lives inside the container. Use `docker compose stop/start/restart`. Do NOT use `down` or `--force-recreate` on certify: the database remembers the key but the file is gone ("No such alias"). Recovery: `docker compose down -v`, start again, re-run `register-campus-id.sh`.
+- Never use `sed -i` on files mounted into the container; edit in place (the setup script does).
+- Issuer in the credential is `http://certify-nginx:80` (a Docker-internal name). Verifiers outside Docker cannot resolve it; this needs a decision before verification (see below).
+
+### Design
+- Format `vc+sd-jwt`: holder can hide name, roll_number, branch, enrollment_status, valid_until. `credential_id` is always disclosed.
+- Certify 0.14.0 attaches status-list revocation only to `ldp_vc`, so revocation for SD-JWT is handled by our backend (`/api/v1/credentials/{id}/revoke`, public list `/api/v1/revocations`), keyed on `credential_id`.
+- Issuance uses the pre-authorized-code flow: the issuer system posts the student's claims to `/pre-authorized-data`; no external login server needed.
+
+### Open items
+- How Inji Verify validates this credential and resolves the issuer key.
+- Photo field (left out of the first version).

@@ -2,7 +2,7 @@
 
 > **Reference Document:** [`.context/team-split.md`](file:///Users/mahendrakumar/Documents/antigravity/charming-volta/.context/team-split.md)  
 > **Goal:** A college can issue, verify, and revoke a campus ID without needing our custom wallet.  
-> **Current Status:** 🟡 In Progress (`~15%`: M2.2 done; M1.2/M1.4 config drafted, not run)
+> **Current Status:** 🟡 In Progress (`~45%`: M1.1-M1.3 and M2.2 done; M1.4 via our backend (not wired to Certify yet))
 
 ---
 
@@ -10,15 +10,15 @@
 
 ### Member 1 (Kislay): Inji Certify, Schema, Issuing, Revocation & Status List
 
-- [ ] **M1.1: Inji Certify Local Deployment**
+- [x] **M1.1: Inji Certify Local Deployment**
   - Clone and set up Inji Certify locally using Docker Compose from the official repository.
   - Verify container health and expose OpenID4VCI endpoints.
-- [ ] **M1.2: Campus ID Credential Schema & SD-JWT Configuration**
+- [x] **M1.2: Campus ID Credential Schema & SD-JWT Configuration**
   - Define Campus ID schema with attributes: `name`, `roll_number`, `branch`, `enrollment_status`, `valid_until`, `photo` (optional).
   - Configure SD-JWT format in Certify to allow field-level disclosure.
   - Set up cryptographic signing keys.
   - Draft: `services/certify-config/campus-id.credential-config.json` + `scripts/register-campus-id.sh`. UNVERIFIED: needs Docker host (see `services/README.md`).
-- [ ] **M1.3: Mock Student Authentication & Issuance Flow**
+- [x] **M1.3: Mock Student Authentication & Issuance Flow**
   - Implement mock student login for credential claiming.
   - Test issuing credentials via OpenID4VCI.
 - [ ] **M1.4: Revocation & Status List Publication**
