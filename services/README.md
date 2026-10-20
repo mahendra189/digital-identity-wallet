@@ -15,7 +15,7 @@ cp .env.example services/.env && cd services && docker compose --env-file .env u
 ## Run Certify / Verify (upstream, Not yet tested: needs a Docker host)
 1. Clone `mosip/inji-certify` and `mosip/inji-verify`; start their compose stacks.
 2. Remap host ports so Certify/Verify/verify-ui/Postgres do not clash with the table above.
-3. `scripts/register-campus-id.sh` posts `certify-config/campus-id.credential-config.json`.
+3. `scripts/setup-certify-local.sh <upstream-compose-dir>` mounts the student data, then `scripts/register-campus-id.sh` posts `certify-config/campus-id.credential-config.json` (SD-JWT; revocation is handled by our backend, not Certify).
 4. Set `CERTIFY_MOCK=false` and `CERTIFY_BASE_URL` to use the real revoke call:
    `POST {certify}/credentials/status` (exists in `CredentialStatusController`; body mirrors `UpdateCredentialStatusRequest`).
 

@@ -1,0 +1,4 @@
+id,name,roll_number,branch,enrollment_status,valid_until,credential_id
+1001,Priya Sharma,21CS042,Computer Science,ACTIVE,2028-06-30,CID-21CS042
+1002,Rahul Verma,21EC017,Electronics,ACTIVE,2028-06-30,CID-21EC017
+1003,Anita Desai,20ME005,Mechanical,GRADUATED,2024-06-30,CID-20ME005

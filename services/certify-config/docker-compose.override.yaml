@@ -1,0 +1,4 @@
+services:
+  certify:
+    volumes:
+      - ./config/campus_identity_data.csv:/home/mosip/config/campus_identity_data.csv
