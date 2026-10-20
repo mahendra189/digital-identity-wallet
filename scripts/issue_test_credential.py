@@ -70,7 +70,10 @@ res = call("POST", f"{BASE}/issuance/credential",
            headers={"Authorization": "Bearer " + tok["access_token"]})
 cred = res["credential"]
 open("issued_campus_id.txt", "w").write(cred)
-print("\nSaved to issued_campus_id.txt\n")
+from cryptography.hazmat.primitives import serialization
+open("holder_key.pem", "wb").write(key.private_bytes(
+    serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+print("\nSaved to issued_campus_id.txt and holder_key.pem (test wallet key)\n")
 parts = cred.split("~")
 print("payload:", json.dumps(json.loads(unb64(parts[0].split(".")[1])), indent=2))
 print("hideable fields (disclosures):")

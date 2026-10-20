@@ -29,3 +29,6 @@ __pycache__/
 .pytest_cache/
 *.db
 .venv/
+issued_campus_id.txt
+holder_key.pem
+presentation.txt
