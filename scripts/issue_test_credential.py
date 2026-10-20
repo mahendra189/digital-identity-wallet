@@ -31,7 +31,13 @@ def call(method, url, body=None, headers=None, form=False):
     req = urllib.request.Request(url, data=data, method=method, headers=h)
     try:
         with urllib.request.urlopen(req) as r:
-            return json.loads(r.read() or b"{}")
+            out = json.loads(r.read() or b"{}")
+            if isinstance(out, dict) and out.get("errors"):
+                print(f"Certify error from {url}\n{json.dumps(out['errors'], indent=2)}")
+                sys.exit(1)
+            if isinstance(out, dict) and isinstance(out.get("response"), dict):
+                out = out["response"]
+            return out
     except urllib.error.HTTPError as e:
         print(f"HTTP {e.code} from {url}\n{e.read().decode()}")
         sys.exit(1)
