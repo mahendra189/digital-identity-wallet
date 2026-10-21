@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import select
 
 from app.config import settings
@@ -33,6 +35,10 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Campus ID Issuer/Verifier API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["*"], allow_headers=["*"])
 app.include_router(router)
+
+_portals = Path(__file__).resolve().parents[2] / "portals"
+if (_portals / "admin").is_dir():
+    app.mount("/admin", StaticFiles(directory=_portals / "admin", html=True), name="admin")
 
 
 @app.get("/health")

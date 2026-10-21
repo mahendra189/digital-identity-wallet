@@ -35,3 +35,9 @@ async def test_rbac(client):
 def test_no_credential_content_columns():
     cols = {c.name for c in CredentialRecord.__table__.columns}
     assert not cols & {"name", "branch", "photo", "marks", "claims", "payload", "credential"}
+
+
+async def test_admin_portal_served(client):
+    r = await client.get("/admin/")
+    assert r.status_code == 200
+    assert "Campus ID" in r.text
