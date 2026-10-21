@@ -41,3 +41,9 @@ async def test_admin_portal_served(client):
     r = await client.get("/admin/")
     assert r.status_code == 200
     assert "Campus ID" in r.text
+
+
+async def test_verifier_portal_served(client):
+    r = await client.get("/verifier/")
+    assert r.status_code == 200
+    assert "Verifier" in r.text

@@ -39,6 +39,8 @@ app.include_router(router)
 _portals = Path(__file__).resolve().parents[2] / "portals"
 if (_portals / "admin").is_dir():
     app.mount("/admin", StaticFiles(directory=_portals / "admin", html=True), name="admin")
+if (_portals / "verifier").is_dir():
+    app.mount("/verifier", StaticFiles(directory=_portals / "verifier", html=True), name="verifier")
 
 
 @app.get("/health")

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Campus ID Verifier</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#16181d;--muted:#667085;--line:#e4e7ec;--accent:#1d4ed8;--bad:#b42318;--ok:#067647;--warn:#b54708}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#171a21;--text:#eceef2;--muted:#98a2b3;--line:#2a2f3a;--accent:#6c8cff;--bad:#f97066;--ok:#47cd89;--warn:#fdb022}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,sans-serif}
+main{max-width:760px;margin:0 auto;padding:24px 16px}
+h1{font-size:20px;margin:0 0 16px}h2{font-size:16px;margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+label{display:block;font-size:13px;color:var(--muted);margin:8px 0 4px}
+input,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font:inherit}
+textarea{min-height:120px;font-family:ui-monospace,monospace;font-size:12px;resize:vertical}
+button{padding:8px 14px;border:0;border-radius:6px;background:var(--accent);color:#fff;font:inherit;cursor:pointer;margin-top:12px}
+button.link{background:none;color:var(--muted);margin:0}button.ghost{background:none;border:1px solid var(--line);color:var(--text);margin:0 0 0 8px}
+.row{display:flex;gap:12px;flex-wrap:wrap}.row>div{flex:1;min-width:200px}
+.top{display:flex;justify-content:space-between;align-items:center}
+.hidden{display:none}.err{color:var(--bad)}.msg{margin-top:10px;font-size:14px}
+.badge{display:inline-block;padding:6px 14px;border-radius:999px;font-weight:600;font-size:15px;border:1px solid currentColor}
+.valid{color:var(--ok)}.revoked{color:var(--bad)}.invalid{color:var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:12px}th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:500}ul{margin:10px 0 0;padding-left:20px}.muted{color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<main>
+<div class="top"><h1>Campus ID — Verifier</h1><button id="logout" class="link hidden">Log out</button></div>
+
+<section id="loginView" class="card">
+  <h2>Log in</h2>
+  <label for="u">Username</label><input id="u" autocomplete="username">
+  <label for="p">Password</label><input id="p" type="password" autocomplete="current-password">
+  <button id="loginBtn">Log in</button>
+  <div id="loginMsg" class="msg err"></div>
+</section>
+
+<div id="appView" class="hidden">
+  <section class="card">
+    <h2>1. Ask the student to share</h2>
+    <p class="muted" style="margin-top:0">The student's wallet must use this exact request code and verifier name when sharing.</p>
+    <div class="row">
+      <div><label for="nonce">Request code</label><input id="nonce" readonly></div>
+      <div><label for="aud">Verifier name</label><input id="aud" value="campus-verifier"></div>
+    </div>
+    <button id="newNonce" class="ghost" style="margin:12px 0 0">New request code</button>
+  </section>
+
+  <section class="card">
+    <h2>2. Check what they shared</h2>
+    <label for="pres">Presentation from the student's wallet</label>
+    <textarea id="pres" spellcheck="false" placeholder="Paste the shared credential here"></textarea>
+    <button id="verifyBtn">Verify</button>
+    <div id="verifyMsg" class="msg err"></div>
+  </section>
+
+  <section id="resultCard" class="card hidden">
+    <h2>Result</h2>
+    <span id="badge" class="badge"></span>
+    <ul id="reasons"></ul>
+    <table id="claimsTable" class="hidden"><thead><tr><th>Field shared</th><th>Value</th></tr></thead><tbody id="claimRows"></tbody></table>
+    <p id="hiddenNote" class="muted"></p>
+    <p id="regNote" class="muted"></p>
+  </section>
+</div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let token = null;
+try { token = sessionStorage.getItem("verifier_token"); } catch (e) {}
+
+async function api(path, opts = {}) {
+  const r = await fetch("/api/v1" + path, {
+    ...opts,
+    headers: {"Content-Type": "application/json", ...(token ? {Authorization: "Bearer " + token} : {})}
+  });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    if (r.status === 401) logout();
+    const d = body.detail;
+    throw new Error((d && d.message) || (typeof d === "string" ? d : "Request failed (" + r.status + ")"));
+  }
+  return body;
+}
+
+function show(loggedIn) {
+  $("loginView").classList.toggle("hidden", loggedIn);
+  $("appView").classList.toggle("hidden", !loggedIn);
+  $("logout").classList.toggle("hidden", !loggedIn);
+}
+function logout() {
+  token = null;
+  try { sessionStorage.removeItem("verifier_token"); } catch (e) {}
+  show(false);
+}
+function newNonce() {
+  const b = new Uint8Array(12); crypto.getRandomValues(b);
+  $("nonce").value = Array.from(b, x => x.toString(16).padStart(2, "0")).join("");
+  $("resultCard").classList.add("hidden");
+}
+
+$("loginBtn").onclick = async () => {
+  try {
+    const r = await api("/auth/login", {method: "POST", body: JSON.stringify({username: $("u").value, password: $("p").value})});
+    token = r.access_token;
+    try { sessionStorage.setItem("verifier_token", token); } catch (e) {}
+    $("loginMsg").textContent = ""; $("p").value = "";
+    show(true); newNonce();
+  } catch (e) { $("loginMsg").textContent = e.message; }
+};
+
+$("newNonce").onclick = newNonce;
+
+$("verifyBtn").onclick = async () => {
+  $("verifyMsg").textContent = "";
+  const pres = $("pres").value.trim();
+  if (!pres) { $("verifyMsg").textContent = "Paste the shared credential first"; return; }
+  try {
+    const r = await api("/verify", {method: "POST", body: JSON.stringify({presentation: pres, nonce: $("nonce").value, aud: $("aud").value.trim()})});
+    const label = {valid: "Valid", revoked: "Revoked", invalid: "Invalid"}[r.status] || r.status;
+    const b = $("badge"); b.textContent = label; b.className = "badge " + r.status;
+    const ul = $("reasons"); ul.replaceChildren();
+    (r.reasons || []).forEach(t => { const li = document.createElement("li"); li.textContent = t; ul.appendChild(li); });
+    const rows = $("claimRows"); rows.replaceChildren();
+    const entries = r.status === "invalid" ? [] : Object.entries(r.claims || {});
+    entries.forEach(([k, v]) => {
+      const tr = document.createElement("tr");
+      [k, String(v)].forEach(t => { const td = document.createElement("td"); td.textContent = t; tr.appendChild(td); });
+      rows.appendChild(tr);
+    });
+    $("claimsTable").classList.toggle("hidden", !entries.length);
+    $("hiddenNote").textContent = r.status === "invalid" ? "" : r.hidden + " field(s) were not shared by the student.";
+    $("regNote").textContent = r.status === "invalid" ? "" :
+      (r.registered ? "Issued by this campus system." : "Not found in the campus register.");
+    $("resultCard").classList.remove("hidden");
+  } catch (e) { $("verifyMsg").textContent = e.message; }
+};
+
+$("logout").onclick = logout;
+if (token) { show(true); newNonce(); } else show(false);
+</script>
+</body>
+</html>
