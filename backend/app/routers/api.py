@@ -11,7 +11,7 @@ from app.deps import current_user, require_admin
 from app.errors import api_error
 from app.models import Account, AuditLog, CredentialRecord
 from app.config import settings
-from app.schemas import (AuditOut, CredentialCreate, CredentialOut, LoginRequest, RevocationStatus, TokenResponse,
+from app.schemas import (AuditOut, CredentialCreate, CredentialOut, IssueOut, IssueRequest, LoginRequest, RevocationStatus, TokenResponse,
                          VerifyRequest, VerifyResult)
 from app.sdjwt_verify import verify_presentation
 from app.security import create_token, verify_password
@@ -38,6 +38,29 @@ async def register_credential(
     s.add(AuditLog(actor=user["sub"], action="ISSUE", target=body.credential_id))
     await s.commit()
     return rec
+
+
+@router.post("/credentials/issue", response_model=IssueOut, status_code=201)
+async def issue_credential(
+    body: IssueRequest,
+    user: dict = Depends(require_admin),
+    s: AsyncSession = Depends(get_session),
+    certify: CertifyClient = Depends(get_certify_client),
+) -> IssueOut:
+    credential_id = f"CID-{body.roll_number}"
+    if await s.get(CredentialRecord, credential_id):
+        raise api_error(409, "ALREADY_EXISTS", "A Campus ID for this roll number was already issued")
+    claims = {"name": body.name, "roll_number": body.roll_number, "branch": body.branch,
+              "enrollment_status": "ACTIVE", "valid_until": body.valid_until, "credential_id": credential_id}
+    try:
+        offer = await certify.create_offer(claims)
+    except httpx.HTTPError as e:
+        raise api_error(502, "CERTIFY_UNAVAILABLE", f"Could not create the credential offer: {e}")
+    s.add(CredentialRecord(credential_id=credential_id, roll_number=body.roll_number,
+                           status_list_credential="own-backend", status_list_index=0))
+    s.add(AuditLog(actor=user["sub"], action="ISSUE", target=credential_id))
+    await s.commit()
+    return IssueOut(credential_id=credential_id, credential_offer_uri=offer, mock=settings.certify_mock)
 
 
 @router.get("/credentials", response_model=list[CredentialOut])

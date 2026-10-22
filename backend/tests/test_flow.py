@@ -47,3 +47,34 @@ async def test_verifier_portal_served(client):
     r = await client.get("/verifier/")
     assert r.status_code == 200
     assert "Verifier" in r.text
+
+
+class _FakeCertify:
+    def __init__(self):
+        self.claims = None
+
+    async def create_offer(self, claims):
+        self.claims = claims
+        return "openid-credential-offer://?credential_offer_uri=https://x/offer/1"
+
+
+async def test_issue_creates_offer_and_registers(client):
+    from app.certify_client import get_certify_client
+    from app.main import app
+    fake = _FakeCertify()
+    app.dependency_overrides[get_certify_client] = lambda: fake
+    try:
+        h = await token(client, "admin", "admin123")
+        body = {"name": "Priya Sharma", "roll_number": "21CS042", "branch": "Computer Science", "valid_until": "2028-06-30"}
+        r = await client.post("/api/v1/credentials/issue", json=body, headers=h)
+        assert r.status_code == 201
+        assert r.json()["credential_id"] == "CID-21CS042"
+        assert r.json()["credential_offer_uri"].startswith("openid-credential-offer://")
+        assert fake.claims["enrollment_status"] == "ACTIVE" and fake.claims["credential_id"] == "CID-21CS042"
+        assert (await client.post("/api/v1/credentials/issue", json=body, headers=h)).status_code == 409
+        ids = [c["credential_id"] for c in (await client.get("/api/v1/credentials", headers=h)).json()]
+        assert ids == ["CID-21CS042"]
+        v = await token(client, "verifier", "verifier123")
+        assert (await client.post("/api/v1/credentials/issue", json=body, headers=v)).status_code == 403
+    finally:
+        app.dependency_overrides.clear()

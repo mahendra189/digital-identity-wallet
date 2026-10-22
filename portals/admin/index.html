@@ -37,6 +37,25 @@ th{color:var(--muted);font-weight:500}.tableWrap{overflow-x:auto}
 
 <div id="appView" class="hidden">
   <section class="card">
+    <h2>Issue a Campus ID</h2>
+    <div class="row">
+      <div><label for="iname">Student name</label><input id="iname" placeholder="Priya Sharma"></div>
+      <div><label for="iroll">Roll number</label><input id="iroll" placeholder="21CS042"></div>
+    </div>
+    <div class="row">
+      <div><label for="ibranch">Branch</label><input id="ibranch" placeholder="Computer Science"></div>
+      <div><label for="ivalid">Valid until</label><input id="ivalid" type="date"></div>
+    </div>
+    <button id="issueBtn">Issue</button>
+    <div id="issueMsg" class="msg"></div>
+    <div id="offerBox" class="hidden">
+      <label for="offer">Give this link to the student's wallet</label>
+      <input id="offer" readonly>
+      <button id="copyOffer" class="link" style="margin-top:6px">Copy</button>
+    </div>
+  </section>
+
+  <section class="card">
     <h2>Register an issued credential</h2>
     <p style="color:var(--muted);margin-top:0">After issuing a Campus ID, register its ID here so it can be tracked and revoked.</p>
     <div class="row">
@@ -150,6 +169,25 @@ $("regBtn").onclick = async () => {
     m.className = "msg ok"; m.textContent = "Registered " + $("cid").value.trim();
     $("cid").value = ""; $("roll").value = ""; refresh();
   } catch (e) { m.className = "msg err"; m.textContent = e.message; }
+};
+
+$("issueBtn").onclick = async () => {
+  const m = $("issueMsg"); $("offerBox").classList.add("hidden");
+  try {
+    const r = await api("/credentials/issue", {method: "POST", body: JSON.stringify({
+      name: $("iname").value.trim(), roll_number: $("iroll").value.trim(),
+      branch: $("ibranch").value.trim(), valid_until: $("ivalid").value})});
+    m.className = "msg ok";
+    m.textContent = "Issued " + r.credential_id + (r.mock ? " (test mode: no real Certify offer)" : "");
+    $("offer").value = r.credential_offer_uri; $("offerBox").classList.remove("hidden");
+    ["iname", "iroll", "ibranch", "ivalid"].forEach(i => $(i).value = "");
+    refresh();
+  } catch (e) { m.className = "msg err"; m.textContent = e.message; }
+};
+
+$("copyOffer").onclick = async () => {
+  try { await navigator.clipboard.writeText($("offer").value); $("copyOffer").textContent = "Copied"; }
+  catch (e) { $("offer").select(); }
 };
 
 $("logout").onclick = logout;

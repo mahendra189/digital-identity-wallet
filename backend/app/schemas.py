@@ -62,3 +62,16 @@ class VerifyResult(BaseModel):
     issuer: str | None
     issuer_cert_sha256: str | None
     registered: bool
+
+
+class IssueRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    roll_number: str = Field(min_length=1, max_length=64)
+    branch: str = Field(min_length=1, max_length=128)
+    valid_until: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+
+class IssueOut(BaseModel):
+    credential_id: str
+    credential_offer_uri: str
+    mock: bool
