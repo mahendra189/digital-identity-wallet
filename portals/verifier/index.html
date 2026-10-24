@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Campus ID Verifier</title>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--text:#16181d;--muted:#667085;--line:#e4e7ec;--accent:#1d4ed8;--accent-text:#fff;--bad:#b42318;--ok:#067647;--warn:#b54708;--ok-bg:#ecfdf3;--bad-bg:#fef3f2;--warn-bg:#fffaeb;--input:#fff}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#171a21;--text:#eceef2;--muted:#98a2b3;--line:#2a2f3a;--accent:#6c8cff;--accent-text:#0f1115;--bad:#f97066;--ok:#47cd89;--warn:#fdb022;--ok-bg:#0c2a1c;--bad-bg:#2d1513;--warn-bg:#2b2008;--input:#0f1115}}
+:root{color-scheme:light;--bg:#f8fafc;--card:#fff;--text:#0f172a;--muted:#64748b;--line:#e2e8f0;--accent:#2563eb;--accent-text:#fff;--bad:#dc2626;--ok:#16a34a;--warn:#d97706;--ok-bg:#f0fdf4;--bad-bg:#fef2f2;--warn-bg:#fffbeb;--input:#fff;--hover:#f1f5f9}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,sans-serif}
 main{max-width:1040px;margin:0 auto;padding:20px 16px 40px}
 h1{font-size:20px;margin:0}h2{font-size:16px;margin:0 0 12px}
@@ -43,14 +42,22 @@ th{color:var(--muted);font-weight:500}.tableWrap{overflow-x:auto}
 details summary{cursor:pointer;color:var(--muted);font-size:14px}
 ul{margin:8px 0 0;padding-left:20px}
 code{font-size:12px;word-break:break-all}
+
+.top{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--line);margin:0!important;padding:0 16px;height:64px}
+.topin{flex:1;max-width:1040px;margin:0 auto;height:64px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:32px;height:32px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+.brand h1{font-size:16px;font-weight:800;letter-spacing:-.01em}.brand h1 span{color:var(--accent)}
+.tag{font:600 10px ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-left:4px}
+main{padding-top:24px!important}
 </style>
 </head>
 <body>
-<main>
-<div class="top">
-  <h1>Campus ID — Verifier</h1>
+<header class="top"><div class="topin">
+  <div class="brand"><div class="logo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><h1>Campus ID <span>Verifier</span></h1><span class="tag">Portal</span></div>
   <div class="who"><span id="whoami"></span><button id="logout" class="link hidden">Log out</button></div>
-</div>
+</div></header>
+<main>
 
 <section id="loginView" class="card" style="max-width:420px">
   <h2>Log in</h2>
@@ -117,7 +124,12 @@ code{font-size:12px;word-break:break-all}
   </section>
 
   <section class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Recent checks</h2><button id="refreshHist" class="link">Refresh</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Recent checks</h2><div><button id="exportHist" class="link">Export CSV</button><button id="refreshHist" class="link">Refresh</button></div></div>
+    <div id="histSummary" class="muted" style="margin-top:4px"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+      <input id="hq" placeholder="Search by credential ID" style="flex:2;min-width:180px">
+      <select id="hFilter" style="flex:1;min-width:130px;width:auto"><option value="all">All results</option><option value="valid">Valid</option><option value="invalid">Not valid</option><option value="revoked">Revoked</option></select>
+    </div>
     <div class="tableWrap"><table style="margin-top:8px">
       <thead><tr><th>Time</th><th>Credential</th><th>Result</th><th>Checked by</th></tr></thead>
       <tbody id="histRows"></tbody>
@@ -267,18 +279,31 @@ $("copyVpUri").onclick = async () => {
   catch (e) { $("vpUri").select(); }
 };
 
-async function loadHistory() {
-  try {
-    const rows = await api("/verifications");
-    const body = $("histRows"); body.replaceChildren();
-    rows.forEach(h => {
-      const tr = document.createElement("tr"); td(tr, fmt(h.at)); td(tr, h.credential_id);
-      const c = document.createElement("td"); const p = document.createElement("span"); p.className = "pill " + h.status; p.textContent = h.status; c.appendChild(p); tr.appendChild(c);
-      td(tr, h.by); body.appendChild(tr);
-    });
-    $("histMsg").textContent = rows.length ? "" : "No checks yet.";
-  } catch (e) { $("histMsg").textContent = e.message; }
+let histRows = [];
+function renderHistory() {
+  const q = $("hq").value.trim().toLowerCase(), f = $("hFilter").value;
+  const rows = histRows.filter(h => (f === "all" || h.status === f) && (!q || h.credential_id.toLowerCase().includes(q)));
+  const body = $("histRows"); body.replaceChildren();
+  rows.forEach(h => {
+    const tr = document.createElement("tr"); td(tr, fmt(h.at)); td(tr, h.credential_id);
+    const c = document.createElement("td"); const p = document.createElement("span"); p.className = "pill " + h.status; p.textContent = h.status === "invalid" ? "not valid" : h.status; c.appendChild(p); tr.appendChild(c);
+    td(tr, h.by); body.appendChild(tr);
+  });
+  const good = histRows.filter(h => h.status === "valid").length;
+  $("histSummary").textContent = histRows.length ? histRows.length + " checks: " + good + " valid, " + (histRows.length - good) + " rejected" : "";
+  $("histMsg").textContent = rows.length ? "" : (histRows.length ? "No match." : "No checks yet.");
 }
+async function loadHistory() {
+  try { histRows = await api("/verifications"); renderHistory(); }
+  catch (e) { $("histMsg").textContent = e.message; }
+}
+$("hq").oninput = renderHistory; $("hFilter").onchange = renderHistory;
+$("exportHist").onclick = () => {
+  const esc = v => '"' + String(v).replace(/"/g, '""') + '"';
+  const csv = ["time,credential,result,checked_by"].concat(histRows.map(h => [h.at, h.credential_id, h.status, h.by].map(esc).join(","))).join("\n");
+  const url = URL.createObjectURL(new Blob([csv], {type: "text/csv"})); const a = document.createElement("a");
+  a.href = url; a.download = "campus-id-checks.csv"; a.click(); URL.revokeObjectURL(url);
+};
 $("refreshHist").onclick = loadHistory;
 $("logout").onclick = async () => { try { await api("/auth/logout", {method: "POST"}); } catch (e) {} logout(); };
 $("p").addEventListener("keydown", e => { if (e.key === "Enter") $("loginBtn").click(); });

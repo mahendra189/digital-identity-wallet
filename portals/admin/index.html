@@ -3,10 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Campus ID Admin</title>
+<title>Campus ID Issuer</title>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--text:#16181d;--muted:#667085;--line:#e4e7ec;--accent:#1d4ed8;--accent-text:#fff;--bad:#b42318;--ok:#067647;--warn:#b54708;--ok-bg:#ecfdf3;--bad-bg:#fef3f2;--warn-bg:#fffaeb;--input:#fff;--hover:#f2f4f7}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#171a21;--text:#eceef2;--muted:#98a2b3;--line:#2a2f3a;--accent:#6c8cff;--accent-text:#0f1115;--bad:#f97066;--ok:#47cd89;--warn:#fdb022;--ok-bg:#0c2a1c;--bad-bg:#2d1513;--warn-bg:#2b2008;--input:#0f1115;--hover:#1d212a}}
+:root{color-scheme:light;--bg:#f8fafc;--card:#fff;--text:#0f172a;--muted:#64748b;--line:#e2e8f0;--accent:#2563eb;--accent-text:#fff;--bad:#dc2626;--ok:#16a34a;--warn:#d97706;--ok-bg:#f0fdf4;--bad-bg:#fef2f2;--warn-bg:#fffbeb;--input:#fff;--hover:#f1f5f9}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,sans-serif}
 main{max-width:1040px;margin:0 auto;padding:20px 16px 40px}
 h1{font-size:20px;margin:0}h2{font-size:16px;margin:0 0 12px}h3{font-size:14px;margin:16px 0 8px}
@@ -41,14 +40,22 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}dt{color:va
 .qrWrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:12px}
 #qr{background:#fff;padding:10px;border-radius:10px;line-height:0}#qr svg{width:200px;height:200px}
 .timeline{margin:0;padding-left:18px}.timeline li{margin-bottom:4px;font-size:14px}
+
+.top{position:sticky;top:0;z-index:10;background:#fff;border-bottom:1px solid var(--line);margin:0!important;padding:0 16px;height:64px}
+.topin{flex:1;max-width:1040px;margin:0 auto;height:64px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:32px;height:32px;border-radius:8px;background:var(--accent);display:flex;align-items:center;justify-content:center}
+.brand h1{font-size:16px;font-weight:800;letter-spacing:-.01em}.brand h1 span{color:var(--accent)}
+.tag{font:600 10px ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-left:4px}
+main{padding-top:24px!important}
 </style>
 </head>
 <body>
-<main>
-<div class="top">
-  <h1>Campus ID — Issuer admin</h1>
+<header class="top"><div class="topin">
+  <div class="brand"><div class="logo"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><h1>Campus ID <span>Issuer</span></h1><span class="tag">Portal</span></div>
   <div class="who"><span id="whoami"></span><button id="logout" class="link hidden">Log out</button></div>
-</div>
+</div></header>
+<main>
 
 <section id="loginView" class="card" style="max-width:420px">
   <h2>Log in</h2>
@@ -108,6 +115,21 @@ dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}dt{color:va
         </div>
       </section>
     </div>
+    <section class="card">
+      <h2>Issue many at once</h2>
+      <div class="muted">Upload a CSV with the columns <code>name, roll_number, branch, valid_until</code>. valid_until is optional and falls back to the date in the form above.</div>
+      <div class="bar" style="margin-top:10px">
+        <input id="csvFile" type="file" accept=".csv,text/csv" style="flex:2">
+        <button id="csvTemplate" class="ghost" type="button">Download template</button>
+        <button id="bulkBtn" type="button" disabled>Issue all</button>
+      </div>
+      <div id="bulkMsg" class="msg"></div>
+      <div class="tableWrap hidden" id="bulkWrap"><table>
+        <thead><tr><th>#</th><th>Name</th><th>Roll no.</th><th>Result</th><th></th></tr></thead>
+        <tbody id="bulkRows"></tbody>
+      </table></div>
+      <button id="bulkExport" class="ghost hidden" type="button" style="margin-top:10px">Download offer links (CSV)</button>
+    </section>
     <section class="card">
       <details>
         <summary class="muted" style="cursor:pointer">Already issued a card another way? Register its ID so it can be tracked and revoked</summary>
@@ -325,6 +347,75 @@ $("regBtn").onclick = async () => {
     await api("/credentials", {method: "POST", body: JSON.stringify({credential_id: $("cid").value.trim(), roll_number: $("roll").value.trim(), status_list_credential: "own-backend", status_list_index: 0})});
     m.className = "msg okc"; m.textContent = "Registered " + $("cid").value.trim(); $("cid").value = ""; $("roll").value = ""; refresh();
   } catch (e) { m.className = "msg err"; m.textContent = e.message; }
+};
+
+/* ---- bulk issue ---- */
+let bulkItems = [], bulkDone = [];
+function parseCsv(text) {
+  const rows = []; let row = [], cell = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i++; } else q = false; } else cell += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === ",") { row.push(cell); cell = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(cell); cell = ""; if (row.some(c => c.trim())) rows.push(row); row = []; }
+    else cell += ch;
+  }
+  row.push(cell); if (row.some(c => c.trim())) rows.push(row);
+  return rows;
+}
+function download(name, text, type) {
+  const url = URL.createObjectURL(new Blob([text], {type})); const a = document.createElement("a");
+  a.href = url; a.download = name; a.click(); URL.revokeObjectURL(url);
+}
+$("csvTemplate").onclick = () => download("campus-id-template.csv", "name,roll_number,branch,valid_until\nPriya Sharma,21CS042,Computer Science,2030-06-30\n", "text/csv");
+$("csvFile").onchange = async () => {
+  const m = $("bulkMsg"); bulkItems = []; bulkDone = []; $("bulkRows").replaceChildren(); $("bulkWrap").classList.add("hidden"); $("bulkExport").classList.add("hidden"); $("bulkBtn").disabled = true;
+  const f = $("csvFile").files[0]; if (!f) return;
+  const rows = parseCsv((await f.text()).replace(/^\uFEFF/, ""));
+  const head = (rows.shift() || []).map(h => h.trim().toLowerCase());
+  const need = ["name", "roll_number", "branch"], miss = need.filter(h => !head.includes(h));
+  if (miss.length) { m.className = "msg err"; m.textContent = "Missing column(s): " + miss.join(", "); return; }
+  const idx = h => head.indexOf(h);
+  const seen = new Set(), errors = [];
+  rows.forEach((r, i) => {
+    const it = {name: (r[idx("name")] || "").trim(), roll_number: (r[idx("roll_number")] || "").trim(), branch: (r[idx("branch")] || "").trim(),
+      valid_until: idx("valid_until") >= 0 ? (r[idx("valid_until")] || "").trim() : ""};
+    if (!it.valid_until) it.valid_until = $("ivalid").value;
+    if (!it.name || !it.roll_number || !it.branch) errors.push("Row " + (i + 2) + ": name, roll number and branch are all needed");
+    else if (seen.has(it.roll_number)) errors.push("Row " + (i + 2) + ": roll number " + it.roll_number + " appears twice");
+    else { seen.add(it.roll_number); bulkItems.push(it); }
+  });
+  if (rows.length > 200) { m.className = "msg err"; m.textContent = "Please keep it to 200 students per file."; bulkItems = []; return; }
+  m.className = errors.length ? "msg err" : "msg"; m.textContent = bulkItems.length + " ready to issue" + (errors.length ? ". Skipped: " + errors.join("; ") : ".");
+  $("bulkBtn").disabled = !bulkItems.length;
+};
+function bulkRow(i, it, text, kind, offer) {
+  const tr = document.createElement("tr"); td(tr, i + 1); td(tr, it.name); td(tr, it.roll_number);
+  const c = document.createElement("td"); c.appendChild(pill(text, kind)); tr.appendChild(c);
+  const a = document.createElement("td");
+  if (offer) { const b = document.createElement("button"); b.className = "ghost"; b.type = "button"; b.textContent = "Show QR";
+    b.onclick = () => { $("noOffer").classList.add("hidden"); $("offerBox").classList.remove("hidden"); $("offer").value = offer; drawQr(offer); window.scrollTo({top: 0, behavior: "smooth"}); }; a.appendChild(b); }
+  tr.appendChild(a); return tr;
+}
+$("bulkBtn").onclick = async () => {
+  const body = $("bulkRows"); body.replaceChildren(); $("bulkWrap").classList.remove("hidden"); $("bulkBtn").disabled = true; bulkDone = [];
+  let ok = 0;
+  for (let i = 0; i < bulkItems.length; i++) {
+    const it = bulkItems[i]; $("bulkMsg").className = "msg"; $("bulkMsg").textContent = "Issuing " + (i + 1) + " of " + bulkItems.length + "...";
+    let tr;
+    try {
+      const r = await api("/credentials/issue", {method: "POST", body: JSON.stringify(it)});
+      ok++; bulkDone.push({...it, credential_id: r.credential_id, offer: r.credential_offer_uri}); tr = bulkRow(i, it, "Issued", "active", r.credential_offer_uri);
+    } catch (e) { tr = bulkRow(i, it, e.message, "other"); }
+    body.appendChild(tr);
+  }
+  $("bulkMsg").className = "msg " + (ok === bulkItems.length ? "okc" : "err"); $("bulkMsg").textContent = ok + " of " + bulkItems.length + " issued." + (ok < bulkItems.length ? " Fix the rows that failed and upload only those again." : "");
+  $("bulkExport").classList.toggle("hidden", !ok); refresh();
+};
+$("bulkExport").onclick = () => {
+  const esc = v => '"' + String(v).replace(/"/g, '""') + '"';
+  download("campus-id-offer-links.csv", ["name,roll_number,credential_id,offer_link"].concat(bulkDone.map(d => [d.name, d.roll_number, d.credential_id, d.offer].map(esc).join(","))).join("\n"), "text/csv");
 };
 $("logout").onclick = async () => { try { await api("/auth/logout", {method: "POST"}); } catch (e) {} logout(); };
 if (token) start(); else show(false);
