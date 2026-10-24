@@ -52,6 +52,8 @@ router = APIRouter(prefix="/api/v1")
 
 # Store active verifier presentation requests: nonce -> request details
 ACTIVE_PRESENTATION_REQUESTS: dict[str, dict[str, Any]] = {}
+# Track consumed nonces to prevent replay even when request metadata is unavailable.
+USED_PRESENTATION_NONCES: dict[str, float] = {}
 
 
 # --- Authentication & Session Management ---
@@ -389,12 +391,18 @@ async def verify(
         if body.nonce not in ACTIVE_PRESENTATION_REQUESTS:
             raise api_error(401, "UNAUTHENTICATED", "Missing bearer token")
 
+    now = time.time()
     req_meta = ACTIVE_PRESENTATION_REQUESTS.get(body.nonce)
+    used_at = USED_PRESENTATION_NONCES.get(body.nonce)
+    if not req_meta and used_at:
+        if now - used_at <= 600:
+            raise api_error(400, "NONCE_USED", "This request code was already used. Create a new request.")
+        USED_PRESENTATION_NONCES.pop(body.nonce, None)
     required_claims = body.required_claims
     if req_meta:
         if not required_claims:
             required_claims = req_meta.get("required_claims")
-        if time.time() - req_meta["created_at"] > 600:
+        if now - req_meta["created_at"] > 600:
             ACTIVE_PRESENTATION_REQUESTS.pop(body.nonce, None)
             raise api_error(400, "EXPIRED_NONCE", "The presentation request nonce has expired")
         if req_meta.get("used"):
@@ -421,6 +429,7 @@ async def verify(
     if req_meta:
         req_meta["result"] = result_payload
         req_meta["used"] = True
+        USED_PRESENTATION_NONCES[body.nonce] = now
 
     return VerifyResult(registered=registered, **res)
 
@@ -440,6 +449,12 @@ async def receive_wallet_presentation(
         raise api_error(400, "BAD_REQUEST", "Presentation and nonce are required")
 
     req_meta = ACTIVE_PRESENTATION_REQUESTS.get(nonce)
+    now = time.time()
+    used_at = USED_PRESENTATION_NONCES.get(nonce)
+    if not req_meta and used_at:
+        if now - used_at <= 600:
+            raise api_error(400, "NONCE_USED", "This request code was already used. Create a new request.")
+        USED_PRESENTATION_NONCES.pop(nonce, None)
     if req_meta and req_meta.get("used"):
         raise api_error(400, "NONCE_USED", "This request code was already used. Create a new request.")
     required_claims = body.get("required_claims")
@@ -467,6 +482,6 @@ async def receive_wallet_presentation(
     if req_meta:
         req_meta["result"] = result_payload
         req_meta["used"] = True
+        USED_PRESENTATION_NONCES[nonce] = now
 
     return result_payload
-

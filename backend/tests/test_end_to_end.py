@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 from cryptography.x509.oid import NameOID
 
 from app.issuer_crypto import b64url, issue_sdjwt_credential
+from app.routers.api import ACTIVE_PRESENTATION_REQUESTS
 from app.sdjwt_verify import build_presentation, verify_presentation
 from app.security import (
     create_token,
@@ -186,6 +187,50 @@ async def test_openid4vci_discovery_and_issuance(client):
         json={"presentation": pres, "nonce": vp_nonce, "aud": "campus-verifier"},
     )
     assert v_replay.status_code == 400
+
+
+async def test_verify_rejects_replayed_nonce_if_request_state_is_missing(client):
+    ver_auth = await token(client, "verifier", "verifier123")
+    holder_key, holder_pem, holder_did, _ = _make_test_holder()
+
+    claims = {
+        "name": "Replay Check",
+        "roll_number": "24CS001",
+        "branch": "CSE",
+        "enrollment_status": "ACTIVE",
+        "valid_until": "2028-12-31",
+        "credential_id": "CID-24CS001",
+    }
+    sdjwt = issue_sdjwt_credential(
+        issuer_url="http://localhost:8000",
+        claims=claims,
+        holder_cnf={"kid": holder_did},
+    )
+
+    req_resp = await client.post(
+        "/api/v1/presentation-requests",
+        headers=ver_auth,
+        json={"client_id": "campus-gate", "client_name": "Campus Gate", "purpose": "Replay check"},
+    )
+    assert req_resp.status_code == 200
+    nonce = req_resp.json()["nonce"]
+    pres = build_presentation(sdjwt, holder_pem, ["enrollment_status", "valid_until"], aud="campus-gate", nonce=nonce)
+
+    first = await client.post(
+        "/api/v1/verify",
+        headers=ver_auth,
+        json={"presentation": pres, "nonce": nonce, "aud": "campus-gate"},
+    )
+    assert first.status_code == 200
+
+    ACTIVE_PRESENTATION_REQUESTS.pop(nonce, None)
+
+    replay = await client.post(
+        "/api/v1/verify",
+        headers=ver_auth,
+        json={"presentation": pres, "nonce": nonce, "aud": "campus-gate"},
+    )
+    assert replay.status_code == 400
 
 
 async def test_server_enforces_mandatory_claims(client):
