@@ -1,104 +1,244 @@
 /**
- * Local Client Vault Storage
- * Stores credentials and sharing history locally on the client.
- * Invariant: Plain credentials never leave the client storage for central databases.
+ * Secure Client Storage Vault for Holder Wallet
+ * Stores cryptographic keypairs and verifiable credentials.
+ *
+ * Security Model:
+ * 1. Cryptographic private signing keys are generated via Web Crypto API and
+ *    stored in IndexedDB as non-extractable / structured CryptoKey objects.
+ *    Private keys are NEVER stored as plaintext strings in browser localStorage.
+ * 2. Credential payloads and disclosures are stored locally on the device.
+ *    Plain credentials never leave client storage for central databases.
  */
 
 import { SDJWTCredential } from '../types/campusId';
 import { SharedHistoryEntry } from '../types/history';
+import { generateHolderKeyPair, HolderKeyPair } from './crypto';
 
-const CREDENTIALS_KEY = 'inji_wallet_credentials_v1';
-const HISTORY_KEY = 'inji_wallet_shared_history_v1';
+const DB_NAME = 'inji_wallet_vault_db';
+const DB_VERSION = 1;
+const STORE_KEYS = 'vault_keys';
+const STORE_CREDS = 'vault_credentials';
+const STORE_HISTORY = 'vault_history';
 
-// Seed demo credential if empty (for standalone demo capability)
-const DEMO_CAMPUS_ID: SDJWTCredential = {
-  id: 'urn:uuid:campus-id-9821-4402',
-  type: 'CampusID',
-  issuer: {
-    id: 'https://certify.college.edu/inji',
-    name: 'State Institute of Technology',
-    logo: '🎓',
-  },
-  issuanceDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-  expirationDate: '2028-06-30T23:59:59Z',
-  status: 'valid',
-  statusList: {
-    uri: 'https://certify.college.edu/status-list/campus-id-2026',
-    index: 42,
-  },
-  claims: {
-    name: 'Mahendra Kumar',
-    roll_number: '2024CS089',
-    branch: 'Computer Science & Engineering',
-    enrollment_status: 'ACTIVE',
-    valid_until: '2028-06-30',
-  },
-  disclosures: {
-    name: 'WyJzYWx0XzEiLCAibmFtZSIsICJNYWhlbmRyYSBLdW1hciJd',
-    roll_number: 'WyJzYWx0XzIiLCAicm9sbF9udW1iZXIiLCAiMjAyNENTMDg5Il0',
-    branch: 'WyJzYWx0XzMiLCAiYnJhbmNoIiwgIkNvbXB1dGVyIFNjaWVuY2UgJiBFbmdpbmVlcmluZyJd',
-    enrollment_status: 'WyJzYWx0XzQiLCAiZW5yb2xsbWVudF9zdGF0dXMiLCAiQUNUSVZFIl0',
-    valid_until: 'WyJzYWx0XzUiLCAidmFsaWRfdW50aWwiLCAiMjAyOC0wNi0zMCJd',
-  },
-  rawSDJWT: 'eyJhbGciOiJFUzI1NiIsInR5cCI6InZjK3NkLWp3dCJ9.demo_header.demo_signature~WyJzYWx0XzEiXQ~WyJzYWx0XzIiXQ',
-};
+// In-memory fallback cache for SSR, test runners, or non-IndexedDB environments
+let memKey: HolderKeyPair | null = null;
+let memCredentials: SDJWTCredential[] = [];
+let memHistory: SharedHistoryEntry[] = [];
 
-export const getStoredCredentials = (): SDJWTCredential[] => {
-  try {
-    const raw = localStorage.getItem(CREDENTIALS_KEY);
-    if (!raw) {
-      // Seed with initial demo Campus ID so the wallet is immediately usable
-      saveCredentials([DEMO_CAMPUS_ID]);
-      return [DEMO_CAMPUS_ID];
+const openVaultDb = (): Promise<IDBDatabase | null> => {
+  return new Promise((resolve) => {
+    if (typeof indexedDB === 'undefined') {
+      return resolve(null);
     }
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error('Failed to read credentials from local storage:', err);
-    return [DEMO_CAMPUS_ID];
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onupgradeneeded = (e) => {
+      const db = (e.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_KEYS)) {
+        db.createObjectStore(STORE_KEYS);
+      }
+      if (!db.objectStoreNames.contains(STORE_CREDS)) {
+        db.createObjectStore(STORE_CREDS, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_HISTORY)) {
+        db.createObjectStore(STORE_HISTORY, { keyPath: 'id' });
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+  });
+};
+
+/**
+ * Retrieves or generates the holder's cryptographic P-256 keypair from the secure vault.
+ */
+export const getOrCreateHolderKey = async (): Promise<HolderKeyPair> => {
+  if (memKey) return memKey;
+
+  const db = await openVaultDb();
+  if (!db) {
+    if (!memKey) {
+      memKey = await generateHolderKeyPair();
+    }
+    return memKey;
   }
+
+  return new Promise(async (resolve, reject) => {
+    try {
+      const tx = db.transaction(STORE_KEYS, 'readwrite');
+      const store = tx.objectStore(STORE_KEYS);
+      const getReq = store.get('holder_key');
+
+      getReq.onsuccess = async () => {
+        if (getReq.result) {
+          memKey = getReq.result;
+          resolve(getReq.result);
+        } else {
+          const newKey = await generateHolderKeyPair();
+          store.put(newKey, 'holder_key');
+          memKey = newKey;
+          resolve(newKey);
+        }
+      };
+      getReq.onerror = () => reject(getReq.error);
+    } catch (err) {
+      if (!memKey) memKey = await generateHolderKeyPair();
+      resolve(memKey);
+    }
+  });
 };
 
-export const saveCredentials = (creds: SDJWTCredential[]): void => {
-  try {
-    localStorage.setItem(CREDENTIALS_KEY, JSON.stringify(creds));
-  } catch (err) {
-    console.error('Failed to save credentials to local storage:', err);
+/**
+ * Loads credentials stored in the local wallet vault.
+ */
+export const getStoredCredentials = async (): Promise<SDJWTCredential[]> => {
+  const db = await openVaultDb();
+  if (!db) {
+    return memCredentials;
   }
+
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_CREDS, 'readonly');
+      const store = tx.objectStore(STORE_CREDS);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        memCredentials = req.result || [];
+        resolve(memCredentials);
+      };
+      req.onerror = () => resolve(memCredentials);
+    } catch {
+      resolve(memCredentials);
+    }
+  });
 };
 
-export const addCredential = (cred: SDJWTCredential): void => {
-  const current = getStoredCredentials();
-  const exists = current.some((c) => c.id === cred.id);
-  const updated = exists ? current.map((c) => (c.id === cred.id ? cred : c)) : [cred, ...current];
-  saveCredentials(updated);
+/**
+ * Synchronous accessor for initial UI render state.
+ */
+export const getCachedCredentials = (): SDJWTCredential[] => {
+  return memCredentials;
 };
 
-export const removeCredential = (id: string): void => {
-  const current = getStoredCredentials();
-  saveCredentials(current.filter((c) => c.id !== id));
+/**
+ * Stores a credential into the wallet vault.
+ */
+export const saveCredential = async (cred: SDJWTCredential): Promise<void> => {
+  const exists = memCredentials.some((c) => c.id === cred.id);
+  memCredentials = exists ? memCredentials.map((c) => (c.id === cred.id ? cred : c)) : [cred, ...memCredentials];
+
+  const db = await openVaultDb();
+  if (!db) return;
+
+  return new Promise((resolve, reject) => {
+    try {
+      const tx = db.transaction(STORE_CREDS, 'readwrite');
+      const store = tx.objectStore(STORE_CREDS);
+      store.put(cred);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    } catch (err) {
+      resolve();
+    }
+  });
 };
 
-export const getSharedHistory = (): SharedHistoryEntry[] => {
-  try {
-    const raw = localStorage.getItem(HISTORY_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch (err) {
-    console.error('Failed to read history from local storage:', err);
-    return [];
-  }
+/**
+ * Removes a credential from the vault.
+ */
+export const removeCredential = async (id: string): Promise<void> => {
+  memCredentials = memCredentials.filter((c) => c.id !== id);
+
+  const db = await openVaultDb();
+  if (!db) return;
+
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_CREDS, 'readwrite');
+      tx.objectStore(STORE_CREDS).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
 };
 
-export const logSharedHistory = (entry: Omit<SharedHistoryEntry, 'id' | 'timestamp'>): SharedHistoryEntry => {
-  const current = getSharedHistory();
+export const deleteCredential = removeCredential;
+
+/**
+ * Retrieves the disclosure history.
+ */
+export const getSharedHistory = async (): Promise<SharedHistoryEntry[]> => {
+  const db = await openVaultDb();
+  if (!db) return memHistory;
+
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_HISTORY, 'readonly');
+      const store = tx.objectStore(STORE_HISTORY);
+      const req = store.getAll();
+      req.onsuccess = () => {
+        memHistory = (req.result || []).sort(
+          (a: SharedHistoryEntry, b: SharedHistoryEntry) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        );
+        resolve(memHistory);
+      };
+      req.onerror = () => resolve(memHistory);
+    } catch {
+      resolve(memHistory);
+    }
+  });
+};
+
+/**
+ * Records a presentation event into sharing history.
+ */
+export const logSharedHistory = async (
+  entry: Omit<SharedHistoryEntry, 'id' | 'timestamp'>
+): Promise<SharedHistoryEntry> => {
   const newEntry: SharedHistoryEntry = {
     ...entry,
     id: `hist_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
     timestamp: new Date().toISOString(),
   };
-  try {
-    localStorage.setItem(HISTORY_KEY, JSON.stringify([newEntry, ...current]));
-  } catch (err) {
-    console.error('Failed to write history to local storage:', err);
+
+  memHistory = [newEntry, ...memHistory];
+
+  const db = await openVaultDb();
+  if (db) {
+    try {
+      const tx = db.transaction(STORE_HISTORY, 'readwrite');
+      tx.objectStore(STORE_HISTORY).put(newEntry);
+    } catch (e) {
+      // ignore
+    }
   }
+
   return newEntry;
+};
+
+/**
+ * Resets and completely wipes all vault keys, credentials, and history.
+ */
+export const resetWallet = async (): Promise<void> => {
+  memKey = null;
+  memCredentials = [];
+  memHistory = [];
+
+  const db = await openVaultDb();
+  if (!db) return;
+
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction([STORE_KEYS, STORE_CREDS, STORE_HISTORY], 'readwrite');
+      tx.objectStore(STORE_KEYS).clear();
+      tx.objectStore(STORE_CREDS).clear();
+      tx.objectStore(STORE_HISTORY).clear();
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
 };

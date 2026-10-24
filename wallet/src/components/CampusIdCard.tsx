@@ -1,5 +1,5 @@
 import React from 'react';
-import { GraduationCap, QrCode, Shield, Calendar, Hash, BookOpen } from 'lucide-react';
+import { GraduationCap, QrCode, Shield, Calendar, Hash, BookOpen, Trash2 } from 'lucide-react';
 import { SDJWTCredential } from '../types/campusId';
 import { StatusBadge } from './StatusBadge';
 
@@ -7,13 +7,16 @@ interface CampusIdCardProps {
   credential: SDJWTCredential;
   onSelect?: () => void;
   onShare?: () => void;
+  onDelete?: () => void;
 }
 
-export const CampusIdCard: React.FC<CampusIdCardProps> = ({ credential, onSelect, onShare }) => {
+export const CampusIdCard: React.FC<CampusIdCardProps> = ({ credential, onSelect, onShare, onDelete }) => {
   const { claims, issuer, status } = credential;
+  const isExpired = claims.valid_until ? new Date(claims.valid_until).getTime() < new Date().setHours(0,0,0,0) : false;
+  const displayStatus = isExpired ? 'expired' : status;
 
   return (
-    <div className="relative group overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-850 to-emerald-950/40 p-6 border border-slate-700/60 shadow-2xl transition-all duration-300 hover:border-emerald-500/50 hover:shadow-emerald-900/20">
+    <div className={`relative group overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-850 to-emerald-950/40 p-6 border shadow-2xl transition-all duration-300 hover:shadow-emerald-900/20 ${isExpired ? 'border-amber-500/50' : 'border-slate-700/60 hover:border-emerald-500/50'}`}>
       {/* Background watermark icon */}
       <div className="absolute -right-6 -bottom-6 text-white/[0.03] pointer-events-none">
         <GraduationCap className="w-56 h-56" />
@@ -30,7 +33,23 @@ export const CampusIdCard: React.FC<CampusIdCardProps> = ({ credential, onSelect
             <p className="text-xs text-slate-400 font-medium">Digital Campus Credential (SD-JWT)</p>
           </div>
         </div>
-        <StatusBadge status={status} />
+        <div className="flex items-center gap-2">
+          <StatusBadge status={displayStatus} />
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (window.confirm(`Delete credential ${credential.id} from wallet vault?`)) {
+                  onDelete();
+                }
+              }}
+              className="p-1.5 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-slate-800 transition-colors"
+              title="Delete credential from vault"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Body: Student Attributes */}
