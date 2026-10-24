@@ -117,7 +117,12 @@ code{font-size:12px;word-break:break-all}
   </section>
 
   <section class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Recent checks</h2><button id="refreshHist" class="link">Refresh</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Recent checks</h2><div><button id="exportHist" class="link">Export CSV</button><button id="refreshHist" class="link">Refresh</button></div></div>
+    <div id="histSummary" class="muted" style="margin-top:4px"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+      <input id="hq" placeholder="Search by credential ID" style="flex:2;min-width:180px">
+      <select id="hFilter" style="flex:1;min-width:130px;width:auto"><option value="all">All results</option><option value="valid">Valid</option><option value="invalid">Not valid</option><option value="revoked">Revoked</option></select>
+    </div>
     <div class="tableWrap"><table style="margin-top:8px">
       <thead><tr><th>Time</th><th>Credential</th><th>Result</th><th>Checked by</th></tr></thead>
       <tbody id="histRows"></tbody>
@@ -267,18 +272,31 @@ $("copyVpUri").onclick = async () => {
   catch (e) { $("vpUri").select(); }
 };
 
-async function loadHistory() {
-  try {
-    const rows = await api("/verifications");
-    const body = $("histRows"); body.replaceChildren();
-    rows.forEach(h => {
-      const tr = document.createElement("tr"); td(tr, fmt(h.at)); td(tr, h.credential_id);
-      const c = document.createElement("td"); const p = document.createElement("span"); p.className = "pill " + h.status; p.textContent = h.status; c.appendChild(p); tr.appendChild(c);
-      td(tr, h.by); body.appendChild(tr);
-    });
-    $("histMsg").textContent = rows.length ? "" : "No checks yet.";
-  } catch (e) { $("histMsg").textContent = e.message; }
+let histRows = [];
+function renderHistory() {
+  const q = $("hq").value.trim().toLowerCase(), f = $("hFilter").value;
+  const rows = histRows.filter(h => (f === "all" || h.status === f) && (!q || h.credential_id.toLowerCase().includes(q)));
+  const body = $("histRows"); body.replaceChildren();
+  rows.forEach(h => {
+    const tr = document.createElement("tr"); td(tr, fmt(h.at)); td(tr, h.credential_id);
+    const c = document.createElement("td"); const p = document.createElement("span"); p.className = "pill " + h.status; p.textContent = h.status === "invalid" ? "not valid" : h.status; c.appendChild(p); tr.appendChild(c);
+    td(tr, h.by); body.appendChild(tr);
+  });
+  const good = histRows.filter(h => h.status === "valid").length;
+  $("histSummary").textContent = histRows.length ? histRows.length + " checks: " + good + " valid, " + (histRows.length - good) + " rejected" : "";
+  $("histMsg").textContent = rows.length ? "" : (histRows.length ? "No match." : "No checks yet.");
 }
+async function loadHistory() {
+  try { histRows = await api("/verifications"); renderHistory(); }
+  catch (e) { $("histMsg").textContent = e.message; }
+}
+$("hq").oninput = renderHistory; $("hFilter").onchange = renderHistory;
+$("exportHist").onclick = () => {
+  const esc = v => '"' + String(v).replace(/"/g, '""') + '"';
+  const csv = ["time,credential,result,checked_by"].concat(histRows.map(h => [h.at, h.credential_id, h.status, h.by].map(esc).join(","))).join("\n");
+  const url = URL.createObjectURL(new Blob([csv], {type: "text/csv"})); const a = document.createElement("a");
+  a.href = url; a.download = "campus-id-checks.csv"; a.click(); URL.revokeObjectURL(url);
+};
 $("refreshHist").onclick = loadHistory;
 $("logout").onclick = async () => { try { await api("/auth/logout", {method: "POST"}); } catch (e) {} logout(); };
 $("p").addEventListener("keydown", e => { if (e.key === "Enter") $("loginBtn").click(); });
