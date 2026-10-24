@@ -15,15 +15,27 @@ import { SharedHistoryEntry } from '../types/history';
 import { generateHolderKeyPair, HolderKeyPair } from './crypto';
 
 const DB_NAME = 'inji_wallet_vault_db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_KEYS = 'vault_keys';
 const STORE_CREDS = 'vault_credentials';
 const STORE_HISTORY = 'vault_history';
+const STORE_UPLOADS = 'vault_uploads';
+
+export interface UploadedDocument {
+  id: string;
+  name: string;
+  category: string;
+  fileSize: number;
+  mimeType: string;
+  dataUrl?: string;
+  createdAt: string;
+}
 
 // In-memory fallback cache for SSR, test runners, or non-IndexedDB environments
 let memKey: HolderKeyPair | null = null;
 let memCredentials: SDJWTCredential[] = [];
 let memHistory: SharedHistoryEntry[] = [];
+let memUploads: UploadedDocument[] = [];
 
 const openVaultDb = (): Promise<IDBDatabase | null> => {
   return new Promise((resolve) => {
@@ -41,6 +53,9 @@ const openVaultDb = (): Promise<IDBDatabase | null> => {
       }
       if (!db.objectStoreNames.contains(STORE_HISTORY)) {
         db.createObjectStore(STORE_HISTORY, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(STORE_UPLOADS)) {
+        db.createObjectStore(STORE_UPLOADS, { keyPath: 'id' });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -164,6 +179,66 @@ export const removeCredential = async (id: string): Promise<void> => {
 };
 
 export const deleteCredential = removeCredential;
+
+/**
+ * Retrieves all user-uploaded documents from the local vault.
+ */
+export const getUploadedDocuments = async (): Promise<UploadedDocument[]> => {
+  const db = await openVaultDb();
+  if (!db) return memUploads;
+
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_UPLOADS, 'readonly');
+      const store = tx.objectStore(STORE_UPLOADS);
+      const req = store.getAll();
+      req.onsuccess = () => resolve((req.result as UploadedDocument[]) || []);
+      req.onerror = () => resolve(memUploads);
+    } catch {
+      resolve(memUploads);
+    }
+  });
+};
+
+/**
+ * Saves a user-uploaded file into the local vault.
+ */
+export const saveUploadedDocument = async (doc: UploadedDocument): Promise<void> => {
+  memUploads = [doc, ...memUploads.filter((d) => d.id !== doc.id)];
+  const db = await openVaultDb();
+  if (!db) return;
+
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_UPLOADS, 'readwrite');
+      tx.objectStore(STORE_UPLOADS).put(doc);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+};
+
+/**
+ * Removes a user-uploaded file from the local vault.
+ */
+export const deleteUploadedDocument = async (id: string): Promise<void> => {
+  memUploads = memUploads.filter((d) => d.id !== id);
+  const db = await openVaultDb();
+  if (!db) return;
+
+  return new Promise((resolve) => {
+    try {
+      const tx = db.transaction(STORE_UPLOADS, 'readwrite');
+      tx.objectStore(STORE_UPLOADS).delete(id);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => resolve();
+    } catch {
+      resolve();
+    }
+  });
+};
 
 /**
  * Retrieves the disclosure history.

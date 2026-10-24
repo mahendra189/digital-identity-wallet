@@ -1,18 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { Header } from './components/Header';
+import { AppShell } from './components/layout/AppShell';
+import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { MyDocumentsPage } from './pages/MyDocumentsPage';
+import { IssuedDocumentsPage } from './pages/IssuedDocumentsPage';
+import { FetchDocumentsPage } from './pages/FetchDocumentsPage';
+import { SharedDocumentsPage } from './pages/SharedDocumentsPage';
+import { IssuersPage } from './pages/IssuersPage';
+import { HistoryPage } from './pages/HistoryPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { ClaimPage } from './pages/ClaimPage';
 import { PresentPage } from './pages/PresentPage';
-import { HistoryPage } from './pages/HistoryPage';
 import { CredentialDetailModal } from './components/CredentialDetailModal';
 import { SDJWTCredential } from './types/campusId';
 import { VerifierPresentationRequest } from './types/presentation';
 import { SharedHistoryEntry } from './types/history';
-import { getStoredCredentials, getSharedHistory, deleteCredential } from './services/storage';
+import {
+  getStoredCredentials,
+  getSharedHistory,
+  deleteCredential,
+  getUploadedDocuments,
+  saveUploadedDocument,
+  deleteUploadedDocument,
+  UploadedDocument,
+} from './services/storage';
 import { parsePresentationRequest } from './services/openid4vp';
-import { claimCredentialFromOffer } from './services/openid4vci';
 import { Check, X } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -25,6 +39,7 @@ export const App: React.FC = () => {
   });
 
   const [credentials, setCredentials] = useState<SDJWTCredential[]>([]);
+  const [uploads, setUploads] = useState<UploadedDocument[]>([]);
   const [history, setHistory] = useState<SharedHistoryEntry[]>([]);
   const [notification, setNotification] = useState<string | null>(null);
 
@@ -49,8 +64,10 @@ export const App: React.FC = () => {
 
   const refreshState = async () => {
     const creds = await getStoredCredentials();
+    const upDocs = await getUploadedDocuments();
     const hist = await getSharedHistory();
     setCredentials(creds);
+    setUploads(upDocs);
     setHistory(hist);
   };
 
@@ -81,13 +98,14 @@ export const App: React.FC = () => {
   const handleLogout = () => {
     localStorage.removeItem('wallet_auth_user');
     setCurrentUser(null);
-    navigate('/login');
+    navigate('/');
     showNotification('Signed out of identity vault.');
   };
 
   const handleLoginSuccess = (username: string) => {
+    localStorage.setItem('wallet_auth_user', username);
     setCurrentUser(username);
-    navigate('/');
+    navigate('/dashboard');
     showNotification(`Welcome back, ${username}.`);
     refreshState();
   };
@@ -98,57 +116,96 @@ export const App: React.FC = () => {
     showNotification(`Removed credential ${id}.`);
   };
 
-  const handleIssueDemo = async () => {
-    try {
-      showNotification('Requesting pre-authorized demo credential...');
-      const resp = await fetch('http://localhost:8000/api/v1/issuer/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          grant_type: 'urn:ietf:params:oauth:grant-type:pre-authorized_code',
-          pre_authorized_code: 'demo_code',
-        }),
-      }).catch(() => null);
-
-      if (resp && resp.ok) {
-        const cred = await claimCredentialFromOffer(
-          'openid-credential-offer://?credential_issuer=http://localhost:8000&pre-authorized_code=demo_code'
-        );
-        await refreshState();
-        showNotification(`Claimed ${cred.id} successfully.`);
-      } else {
-        showNotification('Backend not reachable on http://localhost:8000.');
-      }
-    } catch (err: any) {
-      showNotification(`Issuance error: ${err.message}`);
-    }
+  const handleSaveUpload = async (doc: UploadedDocument) => {
+    await saveUploadedDocument(doc);
+    await refreshState();
   };
 
-  // Route Router Logic
-  const renderCurrentPage = () => {
-    if (!currentUser && currentRoute !== '/register') {
+  const handleDeleteUpload = async (id: string) => {
+    await deleteUploadedDocument(id);
+    await refreshState();
+  };
+
+  // If unauthenticated:
+  if (!currentUser) {
+    if (currentRoute === '/login') {
       return (
-        <LoginPage
-          onLoginSuccess={handleLoginSuccess}
-          onNavigate={navigate}
-        />
+        <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+          <LoginPage onLoginSuccess={handleLoginSuccess} onNavigate={navigate} />
+        </div>
       );
     }
+    if (currentRoute === '/register') {
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8 font-sans">
+          <RegisterPage onRegisterSuccess={handleLoginSuccess} onNavigate={navigate} />
+        </div>
+      );
+    }
+    // Public DigiLocker Landing Page
+    return <LandingPage onNavigate={navigate} />;
+  }
 
+  // If authenticated, route inside the AppShell layout:
+  const renderShellContent = () => {
     switch (currentRoute) {
-      case '/login':
+      case '/my-documents':
         return (
-          <LoginPage
-            onLoginSuccess={handleLoginSuccess}
-            onNavigate={navigate}
+          <MyDocumentsPage
+            documents={uploads}
+            onUpload={handleSaveUpload}
+            onDelete={handleDeleteUpload}
+            onNotification={showNotification}
           />
         );
 
-      case '/register':
+      case '/issued-documents':
         return (
-          <RegisterPage
-            onRegisterSuccess={handleLoginSuccess}
+          <IssuedDocumentsPage
+            credentials={credentials}
             onNavigate={navigate}
+            onSelectCred={(cred) => setActiveInspectionCred(cred)}
+            onDeleteCred={handleDeleteCred}
+            onPresentCred={(cred) => {
+              setSelectedCredForPresent(cred);
+              navigate('/present');
+            }}
+          />
+        );
+
+      case '/fetch-documents':
+        return (
+          <FetchDocumentsPage
+            onNavigate={navigate}
+            onRefresh={refreshState}
+            onNotification={showNotification}
+          />
+        );
+
+      case '/shared-documents':
+        return (
+          <SharedDocumentsPage
+            entries={history}
+            onNavigate={navigate}
+            onNotification={showNotification}
+          />
+        );
+
+      case '/issuers':
+        return <IssuersPage onNavigate={navigate} />;
+
+      case '/history':
+        return <HistoryPage entries={history} onNavigate={navigate} />;
+
+      case '/settings':
+        return (
+          <SettingsPage
+            currentUser={currentUser}
+            onLogout={handleLogout}
+            onNotification={showNotification}
+            onResetWallet={refreshState}
+            issuedCount={credentials.length}
+            uploadedCount={uploads.length}
           />
         );
 
@@ -181,47 +238,45 @@ export const App: React.FC = () => {
           />
         );
 
-      case '/history':
-        return <HistoryPage entries={history} onNavigate={navigate} />;
-
       case '/':
+      case '/dashboard':
       default:
         return (
           <DashboardPage
+            currentUser={currentUser}
             credentials={credentials}
+            uploads={uploads}
+            sharedCount={history.length}
             onNavigate={navigate}
             onSelectCred={(cred) => setActiveInspectionCred(cred)}
-            onDeleteCred={handleDeleteCred}
             onPresentCred={(cred) => {
               setSelectedCredForPresent(cred);
               navigate('/present');
             }}
-            onIssueDemo={handleIssueDemo}
           />
         );
     }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-950 flex flex-col font-sans">
-      {/* Top Navbar */}
-      <Header
-        currentRoute={currentRoute}
-        onNavigate={navigate}
-        currentUser={currentUser}
-        onLogout={handleLogout}
-        credentialsCount={credentials.length}
-      />
-
+    <AppShell
+      currentRoute={currentRoute === '/' ? '/dashboard' : currentRoute}
+      onNavigate={navigate}
+      currentUser={currentUser}
+      onLogout={handleLogout}
+      issuedCount={credentials.length}
+      uploadedCount={uploads.length}
+      sharedCount={history.length}
+    >
       {/* Floating Notification Toast */}
       {notification && (
-        <div className="fixed top-16 right-4 z-50 animate-in slide-in-from-top-2 duration-200">
-          <div className="flex items-center gap-2 rounded-md border border-zinc-200 bg-white px-3.5 py-2.5 text-xs font-medium text-zinc-900 shadow-lg">
+        <div className="fixed top-18 right-6 z-50 animate-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs font-semibold text-slate-900 shadow-xl">
             <Check className="size-4 text-emerald-600 shrink-0" />
             <span>{notification}</span>
             <button
               onClick={() => setNotification(null)}
-              className="ml-2 text-zinc-400 hover:text-zinc-600"
+              className="ml-2 text-slate-400 hover:text-slate-600"
             >
               <X className="size-3.5" />
             </button>
@@ -229,13 +284,8 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {/* Page Content */}
-      <main className="flex-1 w-full">{renderCurrentPage()}</main>
-
-      {/* Footer */}
-      <footer className="border-t border-zinc-200 py-6 text-center text-xs text-zinc-400 bg-white">
-        <p>Digital Identity Wallet &middot; OpenID4VCI & OpenID4VP Standard Architecture</p>
-      </footer>
+      {/* Primary Page Content */}
+      <div className="pb-16">{renderShellContent()}</div>
 
       {/* Cryptographic Inspector Modal */}
       <CredentialDetailModal
@@ -243,7 +293,7 @@ export const App: React.FC = () => {
         credential={activeInspectionCred}
         onClose={() => setActiveInspectionCred(null)}
       />
-    </div>
+    </AppShell>
   );
 };
 
