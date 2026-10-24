@@ -5,217 +5,329 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Campus ID Admin</title>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--text:#16181d;--muted:#667085;--line:#e4e7ec;--accent:#1d4ed8;--bad:#b42318;--ok:#067647}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#171a21;--text:#eceef2;--muted:#98a2b3;--line:#2a2f3a;--accent:#6c8cff;--bad:#f97066;--ok:#47cd89}}
+:root{--bg:#f6f7f9;--card:#fff;--text:#16181d;--muted:#667085;--line:#e4e7ec;--accent:#1d4ed8;--accent-text:#fff;--bad:#b42318;--ok:#067647;--warn:#b54708;--ok-bg:#ecfdf3;--bad-bg:#fef3f2;--warn-bg:#fffaeb;--input:#fff;--hover:#f2f4f7}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#171a21;--text:#eceef2;--muted:#98a2b3;--line:#2a2f3a;--accent:#6c8cff;--accent-text:#0f1115;--bad:#f97066;--ok:#47cd89;--warn:#fdb022;--ok-bg:#0c2a1c;--bad-bg:#2d1513;--warn-bg:#2b2008;--input:#0f1115;--hover:#1d212a}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,sans-serif}
-main{max-width:860px;margin:0 auto;padding:24px 16px}
-h1{font-size:20px;margin:0 0 16px}h2{font-size:16px;margin:0 0 12px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
-label{display:block;font-size:13px;color:var(--muted);margin:8px 0 4px}
-input{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font:inherit}
-button{padding:8px 14px;border:0;border-radius:6px;background:var(--accent);color:#fff;font:inherit;cursor:pointer;margin-top:12px}
-button.danger{background:var(--bad);margin:0;padding:4px 10px}button.link{background:none;color:var(--muted);margin:0}
+main{max-width:1040px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:20px;margin:0}h2{font-size:16px;margin:0 0 12px}h3{font-size:14px;margin:16px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+input,select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--input);color:var(--text);font:inherit}
+button{padding:8px 14px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-text);font:inherit;font-weight:600;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+button.ghost{background:none;border:1px solid var(--line);color:var(--text);font-weight:500}
+button.link{background:none;color:var(--muted);font-weight:500;padding:4px 8px}
+button.danger{background:var(--bad);color:#fff}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px}
+.who{color:var(--muted);font-size:13px;display:flex;align-items:center;gap:8px}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;overflow-x:auto}
+.tabs button{background:none;color:var(--muted);border-radius:8px 8px 0 0;font-weight:500;border-bottom:2px solid transparent}
+.tabs button.on{color:var(--text);border-bottom-color:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+@media (max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.stat .n{font-size:28px;font-weight:700;line-height:1.2}.stat .l{color:var(--muted);font-size:13px}
+.row{display:flex;gap:12px;flex-wrap:wrap}.row>div{flex:1;min-width:200px}
+.hidden{display:none!important}.err{color:var(--bad)}.okc{color:var(--ok)}.msg{margin-top:10px;font-size:14px}.muted{color:var(--muted);font-size:13px}
 table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
 th{color:var(--muted);font-weight:500}.tableWrap{overflow-x:auto}
-.msg{margin-top:10px;font-size:14px}.err{color:var(--bad)}.ok{color:var(--ok)}
-.row{display:flex;gap:12px;flex-wrap:wrap}.row>div{flex:1;min-width:200px}
-.top{display:flex;justify-content:space-between;align-items:center}
-.hidden{display:none}code{font-size:13px}
+tr.click{cursor:pointer}tr.click:hover{background:var(--hover)}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}
+.pill.active,.pill.valid{background:var(--ok-bg);color:var(--ok)}.pill.revoked{background:var(--bad-bg);color:var(--bad)}.pill.invalid,.pill.other{background:var(--warn-bg);color:var(--warn)}
+.bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}.bar input{flex:2;min-width:180px}.bar select{flex:1;min-width:130px;width:auto}
+.split{display:grid;grid-template-columns:1.4fr 1fr;gap:16px}
+@media (max-width:860px){.split{grid-template-columns:1fr}}
+dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0}dt{color:var(--muted)}dd{margin:0;word-break:break-all}
+.qrWrap{display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:12px}
+#qr{background:#fff;padding:10px;border-radius:10px;line-height:0}#qr svg{width:200px;height:200px}
+.timeline{margin:0;padding-left:18px}.timeline li{margin-bottom:4px;font-size:14px}
 </style>
 </head>
 <body>
 <main>
-<div class="top"><h1>Campus ID — Issuer admin</h1><button id="logout" class="link hidden">Log out</button></div>
+<div class="top">
+  <h1>Campus ID — Issuer admin</h1>
+  <div class="who"><span id="whoami"></span><button id="logout" class="link hidden">Log out</button></div>
+</div>
 
-<section id="loginView" class="card">
+<section id="loginView" class="card" style="max-width:420px">
   <h2>Log in</h2>
   <label for="u">Username</label><input id="u" autocomplete="username">
   <label for="p">Password</label><input id="p" type="password" autocomplete="current-password">
-  <button id="loginBtn">Log in</button>
+  <button id="loginBtn" style="margin-top:12px">Log in</button>
   <div id="loginMsg" class="msg err"></div>
 </section>
 
 <div id="appView" class="hidden">
-  <section class="card">
-    <h2>Issue a Campus ID</h2>
-    <div class="row">
-      <div><label for="iname">Student name</label><input id="iname" placeholder="Priya Sharma"></div>
-      <div><label for="iroll">Roll number</label><input id="iroll" placeholder="21CS042"></div>
-    </div>
-    <div class="row">
-      <div><label for="ibranch">Branch</label><input id="ibranch" placeholder="Computer Science"></div>
-      <div><label for="ivalid">Valid until</label><input id="ivalid" type="date" value="2030-12-31"></div>
-    </div>
-    <button id="issueBtn">Issue</button>
-    <div id="issueMsg" class="msg"></div>
-    <div id="offerBox" class="hidden">
-      <label for="offer">Give this link to the student's wallet</label>
-      <input id="offer" readonly>
-      <button id="copyOffer" class="link" style="margin-top:6px">Copy</button>
-    </div>
-  </section>
+  <nav class="tabs" id="tabs">
+    <button data-tab="overview" class="on">Overview</button>
+    <button data-tab="issue">Issue</button>
+    <button data-tab="creds">Credentials</button>
+    <button data-tab="activity">Activity</button>
+  </nav>
+  <div id="globalMsg" class="msg err"></div>
 
-  <section class="card">
-    <h2>Register an issued credential</h2>
-    <p style="color:var(--muted);margin-top:0">After issuing a Campus ID, register its ID here so it can be tracked and revoked.</p>
-    <div class="row">
-      <div><label for="cid">Credential ID</label><input id="cid" placeholder="CID-21CS042"></div>
-      <div><label for="roll">Roll number</label><input id="roll" placeholder="21CS042"></div>
+  <!-- Overview -->
+  <div id="tab-overview">
+    <div class="stats">
+      <div class="stat"><div class="n" id="sTotal">0</div><div class="l">Issued</div></div>
+      <div class="stat"><div class="n okc" id="sActive">0</div><div class="l">Active</div></div>
+      <div class="stat"><div class="n err" id="sRevoked">0</div><div class="l">Revoked</div></div>
+      <div class="stat"><div class="n" id="sChecks">0</div><div class="l">Verification checks</div><div class="muted" id="sChecksSub"></div></div>
     </div>
-    <button id="regBtn">Register</button>
-    <div id="regMsg" class="msg"></div>
-  </section>
+    <section class="card">
+      <h2>Latest activity</h2>
+      <div class="tableWrap"><table><thead><tr><th>Time</th><th>By</th><th>Action</th><th>Credential</th></tr></thead><tbody id="recentRows"></tbody></table></div>
+    </section>
+  </div>
 
-  <section class="card">
-    <h2>Issued credentials</h2>
-    <div class="tableWrap"><table>
-      <thead><tr><th>Credential ID</th><th>Roll no.</th><th>Issued</th><th>Status</th><th></th></tr></thead>
-      <tbody id="credRows"></tbody>
-    </table></div>
-    <div id="credMsg" class="msg"></div>
-  </section>
+  <!-- Issue -->
+  <div id="tab-issue" class="hidden">
+    <div class="split">
+      <section class="card">
+        <h2>Issue a Campus ID</h2>
+        <div class="row">
+          <div><label for="iname">Student name</label><input id="iname" placeholder="Priya Sharma"></div>
+          <div><label for="iroll">Roll number</label><input id="iroll" placeholder="21CS042"></div>
+        </div>
+        <div class="row">
+          <div><label for="ibranch">Branch</label><input id="ibranch" placeholder="Computer Science"></div>
+          <div><label for="ivalid">Valid until</label><input id="ivalid" type="date"></div>
+        </div>
+        <button id="issueBtn" style="margin-top:14px">Issue</button>
+        <div id="issueMsg" class="msg"></div>
+      </section>
+      <section class="card" id="offerCard">
+        <h2>Give this to the student</h2>
+        <div id="noOffer" class="muted">After you issue a card, its QR code and link show here. Each link works once.</div>
+        <div id="offerBox" class="hidden">
+          <div class="qrWrap"><div id="qr"></div><div class="muted">The student scans this in their wallet</div></div>
+          <label for="offer">Or send this link</label>
+          <input id="offer" readonly>
+          <button id="copyOffer" class="ghost" style="margin-top:8px">Copy link</button>
+        </div>
+      </section>
+    </div>
+    <section class="card">
+      <details>
+        <summary class="muted" style="cursor:pointer">Already issued a card another way? Register its ID so it can be tracked and revoked</summary>
+        <div class="row">
+          <div><label for="cid">Credential ID</label><input id="cid" placeholder="CID-21CS042"></div>
+          <div><label for="roll">Roll number</label><input id="roll" placeholder="21CS042"></div>
+        </div>
+        <button id="regBtn" class="ghost" style="margin-top:12px">Register</button>
+        <div id="regMsg" class="msg"></div>
+      </details>
+    </section>
+  </div>
 
-  <section class="card">
-    <h2>Activity log</h2>
-    <div class="tableWrap"><table>
-      <thead><tr><th>Time</th><th>By</th><th>Action</th><th>Target</th></tr></thead>
-      <tbody id="auditRows"></tbody>
-    </table></div>
-  </section>
+  <!-- Credentials -->
+  <div id="tab-creds" class="hidden">
+    <div class="split">
+      <section class="card">
+        <div class="bar">
+          <input id="q" placeholder="Search by credential ID or roll number">
+          <select id="statusFilter"><option value="all">All statuses</option><option value="active">Active</option><option value="revoked">Revoked</option></select>
+        </div>
+        <div class="tableWrap"><table>
+          <thead><tr><th>Credential ID</th><th>Roll no.</th><th>Issued</th><th>Status</th></tr></thead>
+          <tbody id="credRows"></tbody>
+        </table></div>
+        <div id="credMsg" class="muted" style="margin-top:8px"></div>
+      </section>
+      <section class="card" id="detailCard">
+        <h2>Credential details</h2>
+        <div id="noDetail" class="muted">Select a credential to see its details.</div>
+        <div id="detail" class="hidden">
+          <dl>
+            <dt>Credential ID</dt><dd id="dId"></dd>
+            <dt>Roll number</dt><dd id="dRoll"></dd>
+            <dt>Issued</dt><dd id="dIssued"></dd>
+            <dt>Status</dt><dd id="dStatus"></dd>
+          </dl>
+          <h3>History</h3>
+          <ul class="timeline" id="dHistory"></ul>
+          <div id="revokeArea" style="margin-top:16px">
+            <button id="revokeBtn" class="danger">Revoke this credential</button>
+            <div id="confirmBox" class="hidden" style="margin-top:8px">
+              <div class="muted">This cancels the card. Verifiers will reject it from now on, and this cannot be undone.</div>
+              <button id="confirmRevoke" class="danger" style="margin-top:8px">Yes, revoke</button>
+              <button id="cancelRevoke" class="ghost" style="margin:8px 0 0 6px">Cancel</button>
+            </div>
+          </div>
+          <div id="detailMsg" class="msg"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Activity -->
+  <div id="tab-activity" class="hidden">
+    <section class="card">
+      <div class="bar">
+        <input id="aq" placeholder="Search by person or credential">
+        <select id="aFilter"><option value="all">All actions</option><option value="ISSUE">Issued</option><option value="REVOKE">Revoked</option><option value="VERIFY">Verification checks</option></select>
+        <button id="exportCsv" class="ghost">Export CSV</button>
+      </div>
+      <div class="tableWrap"><table><thead><tr><th>Time</th><th>By</th><th>Action</th><th>Credential</th></tr></thead><tbody id="auditRows"></tbody></table></div>
+      <div class="muted" style="margin-top:8px">Showing the latest 200 events.</div>
+    </section>
+  </div>
 </div>
 </main>
+<script src="qrcode.js"></script>
 <script>
 const $ = id => document.getElementById(id);
-let token = null;
+let token = null, me = null, creds = [], audit = [], selected = null;
 try { token = sessionStorage.getItem("admin_token"); } catch (e) {}
 
 async function api(path, opts = {}) {
-  const r = await fetch("/api/v1" + path, {
-    ...opts,
-    headers: {"Content-Type": "application/json", ...(token ? {Authorization: "Bearer " + token} : {})}
-  });
+  const r = await fetch("/api/v1" + path, {...opts, headers: {"Content-Type": "application/json", ...(token ? {Authorization: "Bearer " + token} : {})}});
   const body = await r.json().catch(() => ({}));
   if (!r.ok) {
-    if (r.status === 401) logout();
+    if (r.status === 401 && token) logout();
     const d = body.detail;
-    const msg = (d && d.error && d.error.message) || (d && d.message) || (typeof d === "string" ? d : "Request failed (" + r.status + ")");
-    throw new Error(msg);
-
+    throw new Error((d && d.error && d.error.message) || (d && d.message) || (typeof d === "string" ? d : "Request failed (" + r.status + ")"));
   }
   return body;
 }
-
-function cell(tr, text) { const td = document.createElement("td"); td.textContent = text; tr.appendChild(td); return td; }
-function fmt(s) { return s ? new Date(s).toLocaleString() : ""; }
+const fmt = s => s ? new Date(s).toLocaleString() : "";
+function td(tr, text, cls) { const c = document.createElement("td"); c.textContent = text; if (cls) c.className = cls; tr.appendChild(c); return c; }
+function pill(text, kind) { const s = document.createElement("span"); s.className = "pill " + kind; s.textContent = text; return s; }
+function actionLabel(a) {
+  if (a === "ISSUE") return ["Issued", "active"]; if (a === "REVOKE") return ["Revoked", "revoked"];
+  if (a === "VERIFY_VALID") return ["Check: valid", "valid"]; if (a === "VERIFY_REVOKED") return ["Check: revoked", "revoked"];
+  if (a === "VERIFY_INVALID") return ["Check: not valid", "invalid"]; return [a, "other"];
+}
 
 function show(loggedIn) {
   $("loginView").classList.toggle("hidden", loggedIn);
   $("appView").classList.toggle("hidden", !loggedIn);
   $("logout").classList.toggle("hidden", !loggedIn);
-  if (loggedIn && !$("ivalid").value) {
-    const d = new Date(); d.setFullYear(d.getFullYear() + 4);
-    $("ivalid").value = d.toISOString().split("T")[0];
-  }
+  $("whoami").textContent = loggedIn && me ? "Signed in as " + me : "";
+  if (loggedIn && !$("ivalid").value) { const d = new Date(); d.setFullYear(d.getFullYear() + 4); $("ivalid").value = d.toISOString().split("T")[0]; }
 }
+function logout() { token = null; me = null; try { sessionStorage.removeItem("admin_token"); } catch (e) {} show(false); }
 
-
-function logout() {
-  token = null;
-  try { sessionStorage.removeItem("admin_token"); } catch (e) {}
-  show(false);
-}
+document.querySelectorAll("#tabs button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("#tabs button").forEach(x => x.classList.toggle("on", x === b));
+  ["overview", "issue", "creds", "activity"].forEach(t => $("tab-" + t).classList.toggle("hidden", t !== b.dataset.tab));
+});
 
 async function refresh() {
   try {
-    const [creds, audit] = await Promise.all([api("/credentials"), api("/audit")]);
-    const rows = $("credRows"); rows.replaceChildren();
-    creds.forEach(c => {
-      const tr = document.createElement("tr");
-      cell(tr, c.credential_id); cell(tr, c.roll_number); cell(tr, fmt(c.issued_at));
-      const st = cell(tr, c.revoked_at ? "Revoked " + fmt(c.revoked_at) : "Active");
-      st.className = c.revoked_at ? "err" : "ok";
-      const act = document.createElement("td");
-      if (!c.revoked_at) {
-        const b = document.createElement("button"); b.className = "danger"; b.textContent = "Revoke";
-        b.onclick = () => revoke(c.credential_id);
-        act.appendChild(b);
-      }
-      tr.appendChild(act); rows.appendChild(tr);
-    });
-    if (!creds.length) { const tr = document.createElement("tr"); cell(tr, "Nothing registered yet").colSpan = 5; rows.appendChild(tr); }
-    const ar = $("auditRows"); ar.replaceChildren();
-    audit.forEach(a => { const tr = document.createElement("tr"); cell(tr, fmt(a.at)); cell(tr, a.actor); cell(tr, a.action); cell(tr, a.target); ar.appendChild(tr); });
-    $("credMsg").textContent = "";
-  } catch (e) { $("credMsg").className = "msg err"; $("credMsg").textContent = e.message; }
+    [creds, audit] = await Promise.all([api("/credentials"), api("/audit")]);
+    $("globalMsg").textContent = "";
+  } catch (e) { $("globalMsg").textContent = e.message; return; }
+  renderStats(); renderRecent(); renderCreds(); renderAudit();
+  if (selected) { const c = creds.find(x => x.credential_id === selected); if (c) renderDetail(c); }
 }
 
-async function revoke(id) {
-  if (!confirm("Revoke " + id + "? Verifiers will reject it from now on.")) return;
-  try { await api("/credentials/" + encodeURIComponent(id) + "/revoke", {method: "POST"}); }
-  catch (e) { $("credMsg").className = "msg err"; $("credMsg").textContent = e.message; return; }
-  refresh();
+function renderStats() {
+  const revoked = creds.filter(c => c.revoked_at).length;
+  $("sTotal").textContent = creds.length; $("sRevoked").textContent = revoked; $("sActive").textContent = creds.length - revoked;
+  const checks = audit.filter(a => a.action.startsWith("VERIFY_"));
+  const good = checks.filter(a => a.action === "VERIFY_VALID").length;
+  $("sChecks").textContent = checks.length; $("sChecksSub").textContent = checks.length ? good + " valid, " + (checks.length - good) + " rejected" : "none yet";
+}
+function auditRow(a) {
+  const tr = document.createElement("tr"); td(tr, fmt(a.at)); td(tr, a.actor);
+  const [label, kind] = actionLabel(a.action); const c = document.createElement("td"); c.appendChild(pill(label, kind)); tr.appendChild(c);
+  td(tr, a.target); return tr;
+}
+function renderRecent() {
+  const body = $("recentRows"); body.replaceChildren();
+  audit.slice(0, 8).forEach(a => body.appendChild(auditRow(a)));
+  if (!audit.length) { const tr = document.createElement("tr"); td(tr, "Nothing has happened yet").colSpan = 4; body.appendChild(tr); }
 }
 
+function renderCreds() {
+  const q = $("q").value.trim().toLowerCase(), f = $("statusFilter").value;
+  const rows = creds.filter(c => (!q || c.credential_id.toLowerCase().includes(q) || c.roll_number.toLowerCase().includes(q)) &&
+    (f === "all" || (f === "revoked") === !!c.revoked_at));
+  const body = $("credRows"); body.replaceChildren();
+  rows.forEach(c => {
+    const tr = document.createElement("tr"); tr.className = "click"; td(tr, c.credential_id); td(tr, c.roll_number); td(tr, fmt(c.issued_at));
+    const s = document.createElement("td"); s.appendChild(c.revoked_at ? pill("Revoked", "revoked") : pill("Active", "active")); tr.appendChild(s);
+    tr.onclick = () => { selected = c.credential_id; renderDetail(c); };
+    body.appendChild(tr);
+  });
+  $("credMsg").textContent = rows.length ? rows.length + " of " + creds.length + " shown" : (creds.length ? "No match" : "Nothing issued yet. Use the Issue tab.");
+}
+$("q").oninput = renderCreds; $("statusFilter").onchange = renderCreds;
+
+function renderDetail(c) {
+  $("noDetail").classList.add("hidden"); $("detail").classList.remove("hidden");
+  $("dId").textContent = c.credential_id; $("dRoll").textContent = c.roll_number; $("dIssued").textContent = fmt(c.issued_at);
+  const st = $("dStatus"); st.replaceChildren(c.revoked_at ? pill("Revoked " + fmt(c.revoked_at), "revoked") : pill("Active", "active"));
+  const ul = $("dHistory"); ul.replaceChildren();
+  const mine = audit.filter(a => a.target === c.credential_id).slice().reverse();
+  mine.forEach(a => { const li = document.createElement("li"); li.textContent = fmt(a.at) + " — " + actionLabel(a.action)[0] + " (" + a.actor + ")"; ul.appendChild(li); });
+  if (!mine.length) { const li = document.createElement("li"); li.textContent = "No recorded events"; ul.appendChild(li); }
+  $("revokeArea").classList.toggle("hidden", !!c.revoked_at); $("confirmBox").classList.add("hidden"); $("revokeBtn").classList.remove("hidden"); $("detailMsg").textContent = "";
+}
+$("revokeBtn").onclick = () => { $("confirmBox").classList.remove("hidden"); $("revokeBtn").classList.add("hidden"); };
+$("cancelRevoke").onclick = () => { $("confirmBox").classList.add("hidden"); $("revokeBtn").classList.remove("hidden"); };
+$("confirmRevoke").onclick = async () => {
+  try { await api("/credentials/" + encodeURIComponent(selected) + "/revoke", {method: "POST"}); await refresh(); }
+  catch (e) { $("detailMsg").className = "msg err"; $("detailMsg").textContent = e.message; }
+};
+
+function renderAudit() {
+  const q = $("aq").value.trim().toLowerCase(), f = $("aFilter").value;
+  const body = $("auditRows"); body.replaceChildren();
+  audit.filter(a => (f === "all" || a.action.startsWith(f)) && (!q || a.actor.toLowerCase().includes(q) || a.target.toLowerCase().includes(q)))
+       .forEach(a => body.appendChild(auditRow(a)));
+}
+$("aq").oninput = renderAudit; $("aFilter").onchange = renderAudit;
+$("exportCsv").onclick = () => {
+  const esc = v => '"' + String(v).replace(/"/g, '""') + '"';
+  const csv = ["time,by,action,credential"].concat(audit.map(a => [a.at, a.actor, a.action, a.target].map(esc).join(","))).join("\n");
+  const url = URL.createObjectURL(new Blob([csv], {type: "text/csv"})); const a = document.createElement("a");
+  a.href = url; a.download = "campus-id-activity.csv"; a.click(); URL.revokeObjectURL(url);
+};
+
+async function start() {
+  try { me = (await api("/auth/me")); if (me.role !== "admin") { logout(); $("loginMsg").textContent = "This page is for admins only"; return; } me = me.username; } catch (e) { return; }
+  show(true); refresh();
+}
 $("loginBtn").onclick = async () => {
   try {
     const r = await api("/auth/login", {method: "POST", body: JSON.stringify({username: $("u").value, password: $("p").value})});
     if (r.role !== "admin") throw new Error("This page is for admins only");
-    token = r.access_token;
-    try { sessionStorage.setItem("admin_token", token); } catch (e) {}
-    $("loginMsg").textContent = ""; $("p").value = "";
-    show(true); refresh();
+    token = r.access_token; try { sessionStorage.setItem("admin_token", token); } catch (e) {}
+    $("loginMsg").textContent = ""; $("p").value = ""; start();
   } catch (e) { $("loginMsg").textContent = e.message; }
 };
+$("p").addEventListener("keydown", e => { if (e.key === "Enter") $("loginBtn").click(); });
 
+function drawQr(text) {
+  try { const q = qrcode(0, "M"); q.addData(text); q.make(); $("qr").innerHTML = q.createSvgTag({cellSize: 4, margin: 0, scalable: true}); }
+  catch (e) { $("qr").textContent = "QR unavailable, use the link"; }
+}
+$("issueBtn").onclick = async () => {
+  const m = $("issueMsg"); const name = $("iname").value.trim(), roll = $("iroll").value.trim(), branch = $("ibranch").value.trim();
+  if (!name || !roll || !branch) { m.className = "msg err"; m.textContent = "Please enter student name, roll number and branch."; return; }
+  try {
+    const r = await api("/credentials/issue", {method: "POST", body: JSON.stringify({name, roll_number: roll, branch, valid_until: $("ivalid").value})});
+    m.className = "msg okc"; m.textContent = "Issued " + r.credential_id + (r.mock ? " (test mode: Certify is not used)" : "");
+    $("noOffer").classList.add("hidden"); $("offerBox").classList.remove("hidden"); $("offer").value = r.credential_offer_uri; drawQr(r.credential_offer_uri);
+    ["iname", "iroll", "ibranch"].forEach(i => $(i).value = ""); refresh();
+  } catch (e) { m.className = "msg err"; m.textContent = e.message; }
+};
+$("copyOffer").onclick = async () => {
+  try { await navigator.clipboard.writeText($("offer").value); $("copyOffer").textContent = "Copied"; setTimeout(() => $("copyOffer").textContent = "Copy link", 1800); }
+  catch (e) { $("offer").select(); }
+};
 $("regBtn").onclick = async () => {
   const m = $("regMsg");
   try {
-    await api("/credentials", {method: "POST", body: JSON.stringify({
-      credential_id: $("cid").value.trim(), roll_number: $("roll").value.trim(),
-      status_list_credential: "own-backend", status_list_index: 0})});
-    m.className = "msg ok"; m.textContent = "Registered " + $("cid").value.trim();
-    $("cid").value = ""; $("roll").value = ""; refresh();
+    await api("/credentials", {method: "POST", body: JSON.stringify({credential_id: $("cid").value.trim(), roll_number: $("roll").value.trim(), status_list_credential: "own-backend", status_list_index: 0})});
+    m.className = "msg okc"; m.textContent = "Registered " + $("cid").value.trim(); $("cid").value = ""; $("roll").value = ""; refresh();
   } catch (e) { m.className = "msg err"; m.textContent = e.message; }
 };
-
-$("issueBtn").onclick = async () => {
-  const m = $("issueMsg"); $("offerBox").classList.add("hidden");
-  const name = $("iname").value.trim();
-  const roll = $("iroll").value.trim();
-  const branch = $("ibranch").value.trim();
-  let validUntil = $("ivalid").value;
-
-  if (!name || !roll || !branch) {
-    m.className = "msg err";
-    m.textContent = "Please enter student name, roll number, and branch.";
-    return;
-  }
-  if (!validUntil) {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() + 4);
-    validUntil = d.toISOString().split("T")[0];
-    $("ivalid").value = validUntil;
-  }
-
-  try {
-    const r = await api("/credentials/issue", {method: "POST", body: JSON.stringify({
-      name, roll_number: roll, branch, valid_until: validUntil})});
-    m.className = "msg ok";
-    m.textContent = "Successfully issued " + r.credential_id + "!";
-    $("offer").value = r.credential_offer_uri; $("offerBox").classList.remove("hidden");
-    ["iname", "iroll", "ibranch"].forEach(i => $(i).value = "");
-    refresh();
-  } catch (e) { m.className = "msg err"; m.textContent = e.message; }
-};
-
-
-$("copyOffer").onclick = async () => {
-  try { await navigator.clipboard.writeText($("offer").value); $("copyOffer").textContent = "Copied"; }
-  catch (e) { $("offer").select(); }
-};
-
-$("logout").onclick = logout;
-if (token) { show(true); refresh(); } else show(false);
+$("logout").onclick = async () => { try { await api("/auth/logout", {method: "POST"}); } catch (e) {} logout(); };
+if (token) start(); else show(false);
 </script>
 </body>
 </html>
