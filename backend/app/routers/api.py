@@ -350,6 +350,15 @@ async def create_presentation_request(
     )
 
 
+@router.get("/verifications")
+async def recent_verifications(_: dict = Depends(require_verifier), s: AsyncSession = Depends(get_session)) -> list[dict[str, Any]]:
+    """Latest verification checks, newest first (credential ID and outcome only, never card contents)."""
+    rows = (await s.execute(
+        select(AuditLog).where(AuditLog.action.like("VERIFY_%")).order_by(AuditLog.id.desc()).limit(50)
+    )).scalars().all()
+    return [{"at": r.at, "by": r.actor, "credential_id": r.target, "status": r.action[len("VERIFY_"):].lower()} for r in rows]
+
+
 @router.get("/presentation-requests/{nonce}")
 async def get_presentation_request_status(nonce: str) -> dict[str, Any]:
     req_meta = ACTIVE_PRESENTATION_REQUESTS.get(nonce)
@@ -388,6 +397,8 @@ async def verify(
         if time.time() - req_meta["created_at"] > 600:
             ACTIVE_PRESENTATION_REQUESTS.pop(body.nonce, None)
             raise api_error(400, "EXPIRED_NONCE", "The presentation request nonce has expired")
+        if req_meta.get("used"):
+            raise api_error(400, "NONCE_USED", "This request code was already used. Create a new request.")
 
     revoked = set(
         (await s.execute(select(CredentialRecord.credential_id).where(CredentialRecord.revoked_at.is_not(None)))).scalars().all()
@@ -403,12 +414,13 @@ async def verify(
     )
     cid = res["credential_id"]
     registered = bool(cid and await s.get(CredentialRecord, cid))
-    s.add(AuditLog(actor=user_sub, action="VERIFY", target=cid or "unknown"))
+    s.add(AuditLog(actor=user_sub, action="VERIFY_" + res["status"].upper(), target=cid or "unknown"))
     await s.commit()
 
     result_payload = {"registered": registered, **res}
     if req_meta:
         req_meta["result"] = result_payload
+        req_meta["used"] = True
 
     return VerifyResult(registered=registered, **res)
 
@@ -428,6 +440,8 @@ async def receive_wallet_presentation(
         raise api_error(400, "BAD_REQUEST", "Presentation and nonce are required")
 
     req_meta = ACTIVE_PRESENTATION_REQUESTS.get(nonce)
+    if req_meta and req_meta.get("used"):
+        raise api_error(400, "NONCE_USED", "This request code was already used. Create a new request.")
     required_claims = body.get("required_claims")
     if req_meta and not required_claims:
         required_claims = req_meta.get("required_claims")
@@ -446,12 +460,13 @@ async def receive_wallet_presentation(
     )
     cid = res["credential_id"]
     registered = bool(cid and await s.get(CredentialRecord, cid))
-    s.add(AuditLog(actor="wallet_presentation", action="VERIFY", target=cid or "unknown"))
+    s.add(AuditLog(actor="wallet_presentation", action="VERIFY_" + res["status"].upper(), target=cid or "unknown"))
     await s.commit()
 
     result_payload = {"registered": registered, **res}
     if req_meta:
         req_meta["result"] = result_payload
+        req_meta["used"] = True
 
     return result_payload
 

@@ -78,3 +78,18 @@ async def test_issue_creates_offer_and_registers(client):
         assert (await client.post("/api/v1/credentials/issue", json=body, headers=v)).status_code == 403
     finally:
         app.dependency_overrides.clear()
+
+
+async def test_request_code_single_use_and_history(client):
+    v = await token(client, "verifier", "verifier123")
+    r = await client.post("/api/v1/presentation-requests", json={}, headers=v)
+    nonce = r.json()["nonce"]
+    body = {"presentation": "garbage", "nonce": nonce, "aud": "campus-verifier"}
+    first = await client.post("/api/v1/verify", json=body, headers=v)
+    assert first.status_code == 200 and first.json()["status"] == "invalid"
+    again = await client.post("/api/v1/verify", json=body, headers=v)
+    assert again.status_code == 400
+    assert (await client.get(f"/api/v1/presentation-requests/{nonce}")).json()["status"] == "verified"
+    hist = (await client.get("/api/v1/verifications", headers=v)).json()
+    assert hist and hist[0]["status"] == "invalid" and hist[0]["by"] == "verifier"
+    assert (await client.get("/api/v1/verifications")).status_code in (401, 403)
