@@ -2,7 +2,7 @@
 
 This file acts as a permanent, append-only chronological history (like a git commit log) of AI actions, decisions, and interventions across this repository.
 
-### [2026-10-24 14:15 IST] - `REV-011`: End-to-End System Integration, Security Hardening & Real Protocol Exchanges
+### [2026-10-24 15:45 IST] - `REV-012`: Branch Separation & End-to-End Integration
 - **Author:** AI Agent (Principal Software Engineer & Security Architect)
 - **Actions Taken:**
   - Standardized backend authentication to RFC 7519 JWT with JTI revocation and OWASP PBKDF2 (600,000 iterations).
@@ -11,11 +11,12 @@ This file acts as a permanent, append-only chronological history (like a git com
   - Converted SD-JWT presentation assembly to compute cryptographic `sd_hash` and genuine Key-Binding JWTs (`kb+jwt`).
   - Converted presentation dispatch to direct HTTP POST to verifier callbacks with server-side mandatory claim enforcement and single-use nonce replay defense.
   - Added SQL database migrations, Docker Compose, CI workflow, and full documentation.
+  - Resolved expired credentials handling and React hook lifecycle in wallet presentation modal.
 - **Status:** Complete.
 
 ---
 
-### [2026-10-24 13:18 IST] - `REV-010`: UI Skills Router Ingestion & Team 2 Live Verification
+### [2026-10-24 13:18 IST] - `REV-011`: UI Skills Router Ingestion & Team 2 Live Verification
 - **Author:** AI Agent
 - **User Prompt:** "npx ui-skills start , do this and start building this project and complete task for Team 2 do it fast"
 - **Actions Taken:**
@@ -24,6 +25,29 @@ This file acts as a permanent, append-only chronological history (like a git com
   - Built production distribution via `pnpm run build` (100% clean, 0 errors).
   - Started Vite development server on `http://localhost:3002/`.
   - Updated [`.work/team-2-wallet.md`](file:///Users/mahendrakumar/Documents/antigravity/charming-volta/.work/team-2-wallet.md) and [`AI_TASK_LOG.md`](file:///Users/mahendrakumar/Documents/antigravity/charming-volta/AI_TASK_LOG.md).
+- **Status:** Complete.
+
+---
+
+### [2026-10-16 20:13 IST] - `REV-010`: Pushed Branch `T2/holder-wallet-react` to GitHub
+- **Author:** AI Agent
+- **User Prompt:** "ok push"
+- **Actions Taken:**
+  - Added remote `origin` pointing to `https://github.com/mahendra189/digital-identity-wallet.git`.
+  - Pushed `T2/holder-wallet-react` with upstream tracking (`git push -u origin T2/holder-wallet-react`).
+  - Updated [`AI_TASK_LOG.md`](file:///Users/mahendrakumar/Documents/antigravity/charming-volta/AI_TASK_LOG.md).
+- **Status:** Complete.
+
+---
+
+### [2026-10-16 20:05 IST] - `REV-009`: Switched to Feature Branch `T2/holder-wallet-react` & Committed
+- **Author:** AI Agent
+- **User Prompt:** "make it on branch like T2/<task> not on main"
+- **Actions Taken:**
+  - Created and switched to branch `T2/holder-wallet-react`.
+  - Staged all project files and created commit `936a421` (`feat(team-2): implement react web-based digital identity wallet with SD-JWT selective disclosure`).
+  - Verified `master` / `main` remains clean.
+  - Updated [`AI_TASK_LOG.md`](file:///Users/mahendrakumar/Documents/antigravity/charming-volta/AI_TASK_LOG.md).
 - **Status:** Complete.
 
 ---

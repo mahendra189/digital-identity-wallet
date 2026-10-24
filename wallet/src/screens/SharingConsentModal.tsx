@@ -21,19 +21,25 @@ export const SharingConsentModal: React.FC<SharingConsentModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  if (!isOpen || !request || !credential) return null;
-
-  // By default, enable the required claims, leave others to user preference
-  const [selectedClaims, setSelectedClaims] = useState<Record<string, boolean>>(() => {
-    const initial: Record<string, boolean> = {};
-    request.requiredClaims.forEach((c) => (initial[c] = true));
-    if (request.optionalClaims) {
-      request.optionalClaims.forEach((c) => (initial[c] = false));
-    }
-    return initial;
-  });
-
+  // All hooks must run unconditionally before any early return
+  const [selectedClaims, setSelectedClaims] = useState<Record<string, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Synchronize selected claims whenever request changes
+  React.useEffect(() => {
+    if (request) {
+      const initial: Record<string, boolean> = {};
+      (request.requiredClaims || []).forEach((c) => (initial[c] = true));
+      if (request.optionalClaims) {
+        request.optionalClaims.forEach((c) => (initial[c] = false));
+      }
+      setSelectedClaims(initial);
+      setErrorMessage(null);
+    }
+  }, [request]);
+
+  if (!isOpen || !request || !credential) return null;
 
   const handleToggle = (claimKey: string, enabled: boolean) => {
     setSelectedClaims((prev) => ({
@@ -44,29 +50,17 @@ export const SharingConsentModal: React.FC<SharingConsentModalProps> = ({
 
   const handleApprove = async () => {
     setIsSubmitting(true);
+    setErrorMessage(null);
     try {
       const allowed = Object.entries(selectedClaims)
         .filter(([_, enabled]) => enabled)
         .map(([key]) => key as keyof CampusIdClaims);
 
       const result = await submitPresentationProof(request, credential, allowed);
-
-      // Log into Member 4 local on-device history
-      logSharedHistory({
-        verifierName: request.verifier.name,
-        verifierDomain: request.verifier.domain,
-        purpose: request.verifier.purpose,
-        disclosedClaims: Object.keys(result.submission.disclosedClaims) as Array<keyof CampusIdClaims>,
-        withheldClaims: (['name', 'roll_number', 'branch', 'enrollment_status', 'valid_until'] as Array<keyof CampusIdClaims>).filter(
-          (k) => !result.submission.disclosedClaims[k]
-        ),
-        outcome: 'ACCEPTED',
-      });
-
       onSuccess(result.message);
       onClose();
-    } catch (err) {
-      console.error('Failed to submit presentation:', err);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to submit presentation');
     } finally {
       setIsSubmitting(false);
     }
@@ -83,6 +77,7 @@ export const SharingConsentModal: React.FC<SharingConsentModalProps> = ({
     });
     onClose();
   };
+
 
   const claimLabels: Record<keyof CampusIdClaims, string> = {
     name: 'Full Name',
@@ -131,6 +126,13 @@ export const SharingConsentModal: React.FC<SharingConsentModalProps> = ({
             <strong className="text-emerald-300">Holder-Controlled Selective Disclosure:</strong> You choose which fields are revealed. Unchecked attributes will remain cryptographically concealed from the verifier.
           </p>
         </div>
+
+        {errorMessage && (
+          <div className="mb-3 p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-xs text-red-300">
+            <strong>Verification Error:</strong> {errorMessage}
+          </div>
+        )}
+
 
         {/* Selective Disclosure Toggles */}
         <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 my-2">

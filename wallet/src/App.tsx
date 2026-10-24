@@ -11,7 +11,8 @@ import { SharedHistoryEntry } from './types/history';
 import {
   getStoredCredentials,
   getSharedHistory,
-  addCredential,
+  saveCredential,
+  deleteCredential,
 } from './services/storage';
 import { parsePresentationRequest } from './services/openid4vp';
 import { claimCredentialFromOffer } from './services/openid4vci';
@@ -28,15 +29,44 @@ export const App: React.FC = () => {
   const [activePresentationReq, setActivePresentationReq] = useState<VerifierPresentationRequest | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
-  useEffect(() => {
-    setCredentials(getStoredCredentials());
-    setHistory(getSharedHistory());
-  }, []);
+  const [selectedCredId, setSelectedCredId] = useState<string | null>(null);
 
-  const refreshState = () => {
-    setCredentials(getStoredCredentials());
-    setHistory(getSharedHistory());
+  const refreshState = async () => {
+    const creds = await getStoredCredentials();
+    const hist = await getSharedHistory();
+    setCredentials(creds);
+    setHistory(hist);
   };
+
+  const handleDeleteCredential = async (id: string) => {
+    await deleteCredential(id);
+    await refreshState();
+    showNotification(`🗑️ Credential ${id} removed from vault.`);
+  };
+
+  // Automatically select an unexpired credential, or the chosen one, or the latest
+  const credentialToPresent =
+    credentials.find((c) => c.id === selectedCredId) ||
+    credentials.find((c) => {
+      if (!c.claims.valid_until) return true;
+      return new Date(c.claims.valid_until).getTime() >= new Date().setHours(0, 0, 0, 0);
+    }) ||
+    credentials[0] ||
+    null;
+
+  useEffect(() => {
+    refreshState();
+
+    // Check if opened with a direct request or offer in URL query
+    const params = new URLSearchParams(window.location.search);
+    const reqUri = params.get('request');
+    const offerUri = params.get('offer');
+    if (reqUri) {
+      handleScanPayload(reqUri);
+    } else if (offerUri) {
+      handleScanPayload(offerUri);
+    }
+  }, []);
 
   const showNotification = (msg: string) => {
     setNotification(msg);
@@ -44,51 +74,78 @@ export const App: React.FC = () => {
   };
 
   // Handler for QR scan / URI input
-  const handleScanPayload = (payload: string) => {
+  const handleScanPayload = async (payload: string) => {
+    const trimmed = payload.trim();
+
     // Check if it's a presentation request (OpenID4VP)
-    if (payload.includes('openid4vp://') || payload.includes('required_claims') || payload.includes('library')) {
-      const parsedReq = parsePresentationRequest(payload);
+    if (trimmed.includes('openid4vp') || trimmed.includes('required_claims') || trimmed.includes('response_uri')) {
+      const parsedReq = parsePresentationRequest(trimmed);
       if (parsedReq) {
+        if (credentials.length === 0) {
+          showNotification('⚠️ No credentials in your wallet vault! Please issue/claim a credential before presenting.');
+          return;
+        }
         setActivePresentationReq(parsedReq);
         return;
       }
     }
 
     // Check if it's a credential issuance offer (OpenID4VCI)
-    if (payload.includes('openid-credential-offer://') || payload.includes('credential_issuer')) {
-      claimCredentialFromOffer('https://certify.college.edu/inji', 'Mahendra Kumar', '2024CS089')
-        .then((newCred) => {
-          addCredential(newCred);
-          refreshState();
-          showNotification('🎉 Successfully claimed new Campus ID via OpenID4VCI!');
-        });
+    if (trimmed.includes('openid-credential-offer://') || trimmed.includes('credential_issuer') || trimmed.includes('pre-authorized_code')) {
+      try {
+        showNotification('⏳ Contacting issuer and claiming credential via OpenID4VCI...');
+        const newCred = await claimCredentialFromOffer(trimmed);
+        await saveCredential(newCred);
+        await refreshState();
+        showNotification(`🎉 Successfully claimed Campus ID for ${newCred.claims.name} (${newCred.id})!`);
+      } catch (err: any) {
+        showNotification(`❌ Issuance failed: ${err.message}`);
+      }
       return;
     }
 
     showNotification('⚠️ Unrecognized QR payload. Please provide an OpenID4VP request or OpenID4VCI offer.');
   };
 
-  const handleIssueMock = async () => {
-    const newCred = await claimCredentialFromOffer('https://certify.college.edu/inji');
-    addCredential(newCred);
-    refreshState();
-    showNotification('✅ Issued fresh mock Campus ID to wallet vault');
+  const handleIssueDemo = async () => {
+    try {
+      showNotification('⏳ Requesting credential offer from campus backend...');
+      const resp = await fetch('http://localhost:8000/api/v1/issuer/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          grant_type: 'urn:ietf:params:oauth:grant-type:pre-authorized_code',
+          pre_authorized_code: 'demo_code',
+        }),
+      }).catch(() => null);
+
+      if (resp && resp.ok) {
+        const cred = await claimCredentialFromOffer('openid-credential-offer://?credential_issuer=http://localhost:8000&pre-authorized_code=demo_code');
+        await refreshState();
+        showNotification(`✅ Successfully issued ${cred.id} via local OpenID4VCI service!`);
+      } else {
+        showNotification('⚠️ Backend not reachable on http://localhost:8000. Start backend to issue live credentials.');
+      }
+    } catch (err: any) {
+      showNotification(`❌ Issuance error: ${err.message}`);
+    }
   };
 
   const sampleScanPresets = [
     {
       label: 'Campus Library Gate Request (Requires Enrollment Status only)',
-      payload: 'openid4vp://authorize?client_id=library.campus.edu&client_name=Campus+Central+Library&purpose=Borrowing+privileges+verification&required_claims=enrollment_status,valid_until',
+      payload: 'openid4vp://authorize?client_id=campus-verifier&client_name=Campus+Central+Library&purpose=Borrowing+privileges+verification&required_claims=enrollment_status,valid_until&response_uri=http://localhost:8000/api/v1/presentation',
     },
     {
       label: 'Exam Hall Verification (Requires Name, Roll No, Status)',
-      payload: 'openid4vp://authorize?client_id=exams.campus.edu&client_name=Academic+Examination+Cell&purpose=Identity+and+admit+card+clearance&required_claims=name,roll_number,enrollment_status,valid_until',
+      payload: 'openid4vp://authorize?client_id=campus-verifier&client_name=Academic+Examination+Cell&purpose=Identity+and+admit+card+clearance&required_claims=name,roll_number,enrollment_status,valid_until&response_uri=http://localhost:8000/api/v1/presentation',
     },
     {
-      label: 'OpenID4VCI Issue Offer (State Institute of Tech)',
-      payload: 'openid-credential-offer://?credential_issuer=https://certify.college.edu/inji&credential_configuration_ids=CampusID',
+      label: 'Live Campus Backend Offer (OpenID4VCI)',
+      payload: 'openid-credential-offer://?credential_issuer=http://localhost:8000&credential_configuration_ids=CampusID',
     },
   ];
+
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
@@ -96,7 +153,7 @@ export const App: React.FC = () => {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         onScanClick={() => setIsScannerOpen(true)}
-        onClaimDemoClick={handleIssueMock}
+        onClaimDemoClick={handleIssueDemo}
       />
 
       {/* Floating Notification */}
@@ -130,26 +187,34 @@ export const App: React.FC = () => {
                   onClick={() => setIsScannerOpen(true)}
                   className="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-md flex items-center gap-1.5 transition-all"
                 >
-                  Simulate Verifier Check
+                  Verify or Scan QR
                   <ArrowUpRight className="w-4 h-4" />
                 </button>
               </div>
             </div>
 
             {/* Credentials Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {credentials.map((cred) => (
-                <CampusIdCard
-                  key={cred.id}
-                  credential={cred}
-                  onSelect={() => setActiveInspectionCred(cred)}
-                  onShare={() => {
-                    // Launch mock library verifier request
-                    handleScanPayload(sampleScanPresets[0].payload);
-                  }}
-                />
-              ))}
-            </div>
+            {credentials.length === 0 ? (
+              <div className="p-12 text-center border border-dashed border-slate-800 rounded-2xl">
+                <p className="text-sm text-slate-400">No credentials currently in wallet vault.</p>
+                <p className="text-xs text-slate-500 mt-1">Scan an OpenID4VCI credential offer QR code from the Admin Portal to receive your Campus ID.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {credentials.map((cred) => (
+                  <CampusIdCard
+                    key={cred.id}
+                    credential={cred}
+                    onSelect={() => setActiveInspectionCred(cred)}
+                    onDelete={() => handleDeleteCredential(cred.id)}
+                    onShare={() => {
+                      setSelectedCredId(cred.id);
+                      setIsScannerOpen(true);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <SharedHistoryScreen entries={history} />
@@ -158,7 +223,7 @@ export const App: React.FC = () => {
 
       {/* Footer */}
       <footer className="border-t border-slate-800 py-6 text-center text-xs text-slate-500">
-        <p>Campus ID Digital Identity Wallet &middot; MOSIP Inji Ecosystem &middot; Team 2 Slice</p>
+        <p>Campus ID Digital Identity Wallet &middot; MOSIP Inji Ecosystem</p>
       </footer>
 
       {/* Modals */}
@@ -173,8 +238,11 @@ export const App: React.FC = () => {
       <SharingConsentModal
         isOpen={!!activePresentationReq}
         request={activePresentationReq}
-        credential={credentials[0] || null}
-        onClose={() => setActivePresentationReq(null)}
+        credential={credentialToPresent}
+        onClose={() => {
+          setActivePresentationReq(null);
+          setSelectedCredId(null);
+        }}
         onSuccess={(msg) => {
           showNotification(msg);
           refreshState();
