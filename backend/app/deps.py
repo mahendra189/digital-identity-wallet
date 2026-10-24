@@ -17,3 +17,10 @@ def require_admin(user: dict = Depends(current_user)) -> dict:
     if user["role"] != "admin":
         raise api_error(403, "FORBIDDEN", "Admin role required")
     return user
+
+
+def require_verifier(user: dict = Depends(current_user)) -> dict:
+    if user["role"] not in ("admin", "verifier"):
+        raise api_error(403, "FORBIDDEN", "Verifier or admin role required")
+    return user
+

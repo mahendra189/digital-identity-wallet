@@ -37,10 +37,21 @@ def _jwt_parts(token: str) -> tuple[dict, dict]:
     return json.loads(b64d(head)), json.loads(b64d(payload))
 
 
-def _holder_key(cnf_kid: str) -> ec.EllipticCurvePublicKey:
-    if not cnf_kid.startswith("did:jwk:"):
-        raise ValueError("holder key is not a did:jwk")
-    jwk = json.loads(b64d(cnf_kid[len("did:jwk:"):].split("#")[0]))
+def _holder_key(cnf: dict | str) -> ec.EllipticCurvePublicKey:
+    if isinstance(cnf, str):
+        if not cnf.startswith("did:jwk:"):
+            raise ValueError("holder key is not a did:jwk")
+        jwk = json.loads(b64d(cnf[len("did:jwk:"):].split("#")[0]))
+    elif isinstance(cnf, dict):
+        if "jwk" in cnf:
+            jwk = cnf["jwk"]
+        elif "kid" in cnf and isinstance(cnf["kid"], str) and cnf["kid"].startswith("did:jwk:"):
+            jwk = json.loads(b64d(cnf["kid"][len("did:jwk:"):].split("#")[0]))
+        else:
+            raise ValueError("unsupported cnf structure")
+    else:
+        raise ValueError("unsupported cnf type")
+
     if jwk.get("kty") != "EC" or jwk.get("crv") != "P-256":
         raise ValueError("unsupported holder key type")
     nums = ec.EllipticCurvePublicNumbers(
@@ -54,6 +65,7 @@ def verify_presentation(
     *,
     expected_nonce: str,
     expected_aud: str,
+    required_claims: list[str] | None = None,
     revoked_ids: set[str] | None = None,
     pin_sha256: str | None = None,
 ) -> dict:
@@ -114,10 +126,14 @@ def verify_presentation(
         if kb_head.get("typ") != "kb+jwt" or kb_head.get("alg") != "ES256":
             fail("key-binding JWT has wrong type or algorithm")
             return result
+        cnf = payload.get("cnf")
+        if not cnf:
+            fail("credential has no cnf confirmation claim for holder key binding")
+            return result
         try:
-            _es256_verify(kb, _holder_key(payload["cnf"]["kid"]))
-        except InvalidSignature:
-            fail("key-binding signature does not match the holder key in the credential")
+            _es256_verify(kb, _holder_key(cnf))
+        except (InvalidSignature, ValueError) as e:
+            fail(f"key-binding verification failed: {e}")
             return result
         if kb_payload.get("nonce") != expected_nonce:
             fail("nonce mismatch (possible replay)")
@@ -130,17 +146,28 @@ def verify_presentation(
         if not isinstance(iat, int) or abs(datetime.now(timezone.utc).timestamp() - iat) > 300:
             fail("key-binding JWT is not fresh")
 
-        # 4. expiry (only checkable if the holder revealed valid_until)
+        # 4. server-side required claims enforcement
+        if required_claims:
+            for rc in required_claims:
+                if rc not in claims or claims[rc] is None:
+                    fail(f"mandatory requested claim '{rc}' was not disclosed")
+
+        # 5. expiry (only checkable if the holder revealed valid_until)
         vu = claims.get("valid_until")
-        if vu and date.fromisoformat(vu) < date.today():
-            fail("credential has expired")
+        if vu:
+            try:
+                vu_str = str(vu).split("T")[0].strip()
+                if date.fromisoformat(vu_str) < date.today():
+                    fail(f"credential has expired: valid_until ({vu_str}) is in the past (current system date is {date.today().isoformat()})")
+            except Exception:
+                fail(f"invalid valid_until date format: {vu}")
         if claims.get("enrollment_status") in ("SUSPENDED",):
             fail("enrollment is suspended")
 
         if result["reasons"]:
             return result
 
-        # 5. revocation (our own list, keyed on the always-disclosed credential_id)
+        # 6. revocation (our own list, keyed on the always-disclosed credential_id)
         cid = claims.get("credential_id")
         if not cid:
             fail("credential has no credential_id")

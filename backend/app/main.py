@@ -36,7 +36,19 @@ app = FastAPI(title="Campus ID Issuer/Verifier API", version="0.1.0", lifespan=l
 app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_methods=["*"], allow_headers=["*"])
 app.include_router(router)
 
+
+@app.get("/.well-known/openid-credential-issuer")
+async def root_issuer_metadata():
+    from app.routers.api import get_issuer_metadata
+    return await get_issuer_metadata()
+
+
 _portals = Path(__file__).resolve().parents[2] / "portals"
+if not (_portals / "admin").is_dir():
+    _portals = Path(__file__).resolve().parent.parent / "portals"
+if not (_portals / "admin").is_dir():
+    _portals = Path("/portals")
+
 if (_portals / "admin").is_dir():
     app.mount("/admin", StaticFiles(directory=_portals / "admin", html=True), name="admin")
 if (_portals / "verifier").is_dir():

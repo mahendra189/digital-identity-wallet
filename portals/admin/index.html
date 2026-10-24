@@ -44,7 +44,7 @@ th{color:var(--muted);font-weight:500}.tableWrap{overflow-x:auto}
     </div>
     <div class="row">
       <div><label for="ibranch">Branch</label><input id="ibranch" placeholder="Computer Science"></div>
-      <div><label for="ivalid">Valid until</label><input id="ivalid" type="date"></div>
+      <div><label for="ivalid">Valid until</label><input id="ivalid" type="date" value="2030-12-31"></div>
     </div>
     <button id="issueBtn">Issue</button>
     <div id="issueMsg" class="msg"></div>
@@ -98,7 +98,9 @@ async function api(path, opts = {}) {
   if (!r.ok) {
     if (r.status === 401) logout();
     const d = body.detail;
-    throw new Error((d && d.message) || (typeof d === "string" ? d : "Request failed (" + r.status + ")"));
+    const msg = (d && d.error && d.error.message) || (d && d.message) || (typeof d === "string" ? d : "Request failed (" + r.status + ")");
+    throw new Error(msg);
+
   }
   return body;
 }
@@ -110,7 +112,12 @@ function show(loggedIn) {
   $("loginView").classList.toggle("hidden", loggedIn);
   $("appView").classList.toggle("hidden", !loggedIn);
   $("logout").classList.toggle("hidden", !loggedIn);
+  if (loggedIn && !$("ivalid").value) {
+    const d = new Date(); d.setFullYear(d.getFullYear() + 4);
+    $("ivalid").value = d.toISOString().split("T")[0];
+  }
 }
+
 
 function logout() {
   token = null;
@@ -173,17 +180,34 @@ $("regBtn").onclick = async () => {
 
 $("issueBtn").onclick = async () => {
   const m = $("issueMsg"); $("offerBox").classList.add("hidden");
+  const name = $("iname").value.trim();
+  const roll = $("iroll").value.trim();
+  const branch = $("ibranch").value.trim();
+  let validUntil = $("ivalid").value;
+
+  if (!name || !roll || !branch) {
+    m.className = "msg err";
+    m.textContent = "Please enter student name, roll number, and branch.";
+    return;
+  }
+  if (!validUntil) {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + 4);
+    validUntil = d.toISOString().split("T")[0];
+    $("ivalid").value = validUntil;
+  }
+
   try {
     const r = await api("/credentials/issue", {method: "POST", body: JSON.stringify({
-      name: $("iname").value.trim(), roll_number: $("iroll").value.trim(),
-      branch: $("ibranch").value.trim(), valid_until: $("ivalid").value})});
+      name, roll_number: roll, branch, valid_until: validUntil})});
     m.className = "msg ok";
-    m.textContent = "Issued " + r.credential_id + (r.mock ? " (test mode: no real Certify offer)" : "");
+    m.textContent = "Successfully issued " + r.credential_id + "!";
     $("offer").value = r.credential_offer_uri; $("offerBox").classList.remove("hidden");
-    ["iname", "iroll", "ibranch", "ivalid"].forEach(i => $(i).value = "");
+    ["iname", "iroll", "ibranch"].forEach(i => $(i).value = "");
     refresh();
   } catch (e) { m.className = "msg err"; m.textContent = e.message; }
 };
+
 
 $("copyOffer").onclick = async () => {
   try { await navigator.clipboard.writeText($("offer").value); $("copyOffer").textContent = "Copied"; }
