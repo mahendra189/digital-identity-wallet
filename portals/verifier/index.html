@@ -5,118 +5,177 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Campus ID Verifier</title>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--text:#16181d;--muted:#667085;--line:#e4e7ec;--accent:#1d4ed8;--bad:#b42318;--ok:#067647;--warn:#b54708}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#171a21;--text:#eceef2;--muted:#98a2b3;--line:#2a2f3a;--accent:#6c8cff;--bad:#f97066;--ok:#47cd89;--warn:#fdb022}}
+:root{--bg:#f6f7f9;--card:#fff;--text:#16181d;--muted:#667085;--line:#e4e7ec;--accent:#1d4ed8;--accent-text:#fff;--bad:#b42318;--ok:#067647;--warn:#b54708;--ok-bg:#ecfdf3;--bad-bg:#fef3f2;--warn-bg:#fffaeb;--input:#fff}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#171a21;--text:#eceef2;--muted:#98a2b3;--line:#2a2f3a;--accent:#6c8cff;--accent-text:#0f1115;--bad:#f97066;--ok:#47cd89;--warn:#fdb022;--ok-bg:#0c2a1c;--bad-bg:#2d1513;--warn-bg:#2b2008;--input:#0f1115}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,sans-serif}
-main{max-width:760px;margin:0 auto;padding:24px 16px}
-h1{font-size:20px;margin:0 0 16px}h2{font-size:16px;margin:0 0 12px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
-label{display:block;font-size:13px;color:var(--muted);margin:8px 0 4px}
-input,textarea{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--text);font:inherit}
-textarea{min-height:120px;font-family:ui-monospace,monospace;font-size:12px;resize:vertical}
-button{padding:8px 14px;border:0;border-radius:6px;background:var(--accent);color:#fff;font:inherit;cursor:pointer;margin-top:12px}
-button.link{background:none;color:var(--muted);margin:0}button.ghost{background:none;border:1px solid var(--line);color:var(--text);margin:0 0 0 8px}
-.row{display:flex;gap:12px;flex-wrap:wrap}.row>div{flex:1;min-width:200px}
-.top{display:flex;justify-content:space-between;align-items:center}
-.hidden{display:none}.err{color:var(--bad)}.msg{margin-top:10px;font-size:14px}
-.badge{display:inline-block;padding:6px 14px;border-radius:999px;font-weight:600;font-size:15px;border:1px solid currentColor}
-.valid{color:var(--ok)}.revoked{color:var(--bad)}.invalid{color:var(--warn)}
-table{width:100%;border-collapse:collapse;font-size:14px;margin-top:12px}th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
-th{color:var(--muted);font-weight:500}ul{margin:10px 0 0;padding-left:20px}.muted{color:var(--muted);font-size:13px}
+main{max-width:1040px;margin:0 auto;padding:20px 16px 40px}
+h1{font-size:20px;margin:0}h2{font-size:16px;margin:0 0 12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+input,textarea,select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--input);color:var(--text);font:inherit}
+textarea{min-height:110px;font-family:ui-monospace,monospace;font-size:12px;resize:vertical}
+button{padding:8px 14px;border:0;border-radius:8px;background:var(--accent);color:var(--accent-text);font:inherit;font-weight:600;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+button.ghost{background:none;border:1px solid var(--line);color:var(--text);font-weight:500}
+button.link{background:none;color:var(--muted);font-weight:500;padding:4px 8px}
+.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px}
+.who{color:var(--muted);font-size:13px;display:flex;align-items:center;gap:8px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:760px){.grid{grid-template-columns:1fr}}
+.hidden{display:none!important}.err{color:var(--bad)}.msg{margin-top:10px;font-size:14px}.muted{color:var(--muted);font-size:13px}
+.fields{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-items:center}
+.fields select{width:auto}
+.presets{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 4px}
+.qrWrap{display:flex;flex-direction:column;align-items:center;gap:10px;padding:8px 0}
+#qr{background:#fff;padding:10px;border-radius:10px;line-height:0}
+#qr svg{width:220px;height:220px}
+.status{display:flex;align-items:center;gap:8px;font-weight:600}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--warn);animation:pulse 1.2s infinite}
+.dot.done{animation:none;background:var(--ok)}.dot.stop{animation:none;background:var(--muted)}
+@keyframes pulse{50%{opacity:.3}}
+.banner{border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:14px;margin-bottom:12px}
+.banner .big{font-size:22px;font-weight:700}
+.banner.valid{background:var(--ok-bg);color:var(--ok)}.banner.revoked{background:var(--bad-bg);color:var(--bad)}.banner.invalid{background:var(--warn-bg);color:var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{text-align:left;padding:8px 6px;border-bottom:1px solid var(--line)}
+th{color:var(--muted);font-weight:500}.tableWrap{overflow-x:auto}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600}
+.pill.valid{background:var(--ok-bg);color:var(--ok)}.pill.revoked{background:var(--bad-bg);color:var(--bad)}.pill.invalid{background:var(--warn-bg);color:var(--warn)}
+details summary{cursor:pointer;color:var(--muted);font-size:14px}
+ul{margin:8px 0 0;padding-left:20px}
+code{font-size:12px;word-break:break-all}
 </style>
 </head>
 <body>
 <main>
-<div class="top"><h1>Campus ID — Verifier</h1><button id="logout" class="link hidden">Log out</button></div>
+<div class="top">
+  <h1>Campus ID — Verifier</h1>
+  <div class="who"><span id="whoami"></span><button id="logout" class="link hidden">Log out</button></div>
+</div>
 
-<section id="loginView" class="card">
+<section id="loginView" class="card" style="max-width:420px">
   <h2>Log in</h2>
   <label for="u">Username</label><input id="u" autocomplete="username">
   <label for="p">Password</label><input id="p" type="password" autocomplete="current-password">
-  <button id="loginBtn">Log in</button>
+  <button id="loginBtn" style="margin-top:12px">Log in</button>
   <div id="loginMsg" class="msg err"></div>
 </section>
 
 <div id="appView" class="hidden">
-  <section class="card">
-    <h2>1. Ask the student to share (OpenID4VP)</h2>
-    <p class="muted" style="margin-top:0">The student's wallet must use this exact request code and verifier name when sharing.</p>
-    <div class="row">
-      <div><label for="nonce">Request code (Nonce)</label><input id="nonce" readonly></div>
-      <div><label for="aud">Verifier name (Audience)</label><input id="aud" value="campus-verifier"></div>
-    </div>
-    <div class="row" style="margin-top:8px">
-      <div><label for="reqClaims">Required fields</label><input id="reqClaims" value="enrollment_status,valid_until" readonly></div>
-      <div><label for="purpose">Purpose</label><input id="purpose" value="Verify active student enrollment"></div>
-    </div>
-    <div style="display:flex;gap:8px;margin-top:12px">
-      <button id="genRequestBtn">Generate OpenID4VP request</button>
-      <button id="newNonce" class="ghost">Manual refresh nonce</button>
-    </div>
-    <div id="vpReqBox" class="hidden" style="margin-top:12px">
-      <label for="vpUri">Give this OpenID4VP link to student wallet</label>
-      <input id="vpUri" readonly>
-      <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
-        <button id="copyVpUri" class="link" style="margin:0">Copy link</button>
-        <a id="openWallet" target="_blank" style="color:var(--accent);font-size:13px;text-decoration:none;font-weight:600">Open directly in Wallet &rarr;</a>
+  <div class="grid">
+    <section class="card">
+      <h2>1. Ask the student to share</h2>
+      <label for="purpose">Why are you checking?</label>
+      <input id="purpose" value="Verify active student enrollment">
+      <label for="aud">Verifier name</label>
+      <input id="aud" value="campus-verifier">
+      <label>What do you need to see?</label>
+      <div class="presets">
+        <button class="ghost" type="button" data-preset="status">Active student only</button>
+        <button class="ghost" type="button" data-preset="identity">Full identity</button>
       </div>
-    </div>
-  </section>
+      <div class="fields" id="fieldList"></div>
+      <button id="createBtn" style="margin-top:14px">Create request</button>
+      <div id="createMsg" class="msg err"></div>
+    </section>
 
-  <section class="card">
-    <h2>2. Check what they shared</h2>
-    <label for="pres">Presentation from the student's wallet</label>
-    <textarea id="pres" spellcheck="false" placeholder="Paste the shared credential (SD-JWT with Key-Binding) here"></textarea>
-    <button id="verifyBtn">Verify</button>
-    <div id="verifyMsg" class="msg err"></div>
-  </section>
-
+    <section class="card" id="requestCard">
+      <h2>2. Student scans this</h2>
+      <div id="noRequest" class="muted">Create a request to show the QR code here.</div>
+      <div id="requestBox" class="hidden">
+        <div class="qrWrap">
+          <div id="qr"></div>
+          <div class="status"><span id="dot" class="dot"></span><span id="statusText">Waiting for the student's wallet…</span></div>
+          <div class="muted" id="countdown"></div>
+        </div>
+        <label for="vpUri">Or send this link</label>
+        <input id="vpUri" readonly>
+        <div style="display:flex;gap:10px;margin-top:8px;align-items:center;flex-wrap:wrap">
+          <button id="copyVpUri" class="ghost">Copy link</button>
+          <a id="openWallet" target="_blank" rel="noopener" style="color:var(--accent);font-size:14px;font-weight:600;text-decoration:none">Open in wallet &rarr;</a>
+        </div>
+      </div>
+    </section>
+  </div>
 
   <section id="resultCard" class="card hidden">
-    <h2>Result</h2>
-    <span id="badge" class="badge"></span>
+    <h2>3. Result</h2>
+    <div id="banner" class="banner"><span id="bannerIcon" class="big"></span><div><div id="bannerText" class="big"></div><div id="bannerSub" class="muted"></div></div></div>
     <ul id="reasons"></ul>
-    <table id="claimsTable" class="hidden"><thead><tr><th>Field shared</th><th>Value</th></tr></thead><tbody id="claimRows"></tbody></table>
+    <table id="claimsTable" class="hidden" style="margin-top:10px"><thead><tr><th>Field shared</th><th>Value</th></tr></thead><tbody id="claimRows"></tbody></table>
     <p id="hiddenNote" class="muted"></p>
-    <p id="regNote" class="muted"></p>
+    <p id="regNote" class="muted" style="margin-top:0"></p>
+  </section>
+
+  <section class="card">
+    <details id="manual">
+      <summary>Wallet not available? Paste the shared credential instead</summary>
+      <label for="pres">Presentation from the student's wallet</label>
+      <textarea id="pres" spellcheck="false" placeholder="Paste the shared credential (SD-JWT with key-binding) here"></textarea>
+      <button id="verifyBtn" style="margin-top:10px">Verify pasted text</button>
+      <div id="verifyMsg" class="msg err"></div>
+    </details>
+  </section>
+
+  <section class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Recent checks</h2><button id="refreshHist" class="link">Refresh</button></div>
+    <div class="tableWrap"><table style="margin-top:8px">
+      <thead><tr><th>Time</th><th>Credential</th><th>Result</th><th>Checked by</th></tr></thead>
+      <tbody id="histRows"></tbody>
+    </table></div>
+    <div id="histMsg" class="muted"></div>
   </section>
 </div>
 </main>
+<script src="qrcode.js"></script>
 <script>
 const $ = id => document.getElementById(id);
-let token = null;
+const FIELDS = [["enrollment_status", "Enrollment status"], ["valid_until", "Valid until"], ["name", "Name"], ["roll_number", "Roll number"], ["branch", "Branch"]];
+const PRESETS = {status: {enrollment_status: "required", valid_until: "required", name: "optional", roll_number: "optional", branch: "optional"},
+                 identity: {enrollment_status: "required", valid_until: "required", name: "required", roll_number: "required", branch: "optional"}};
+const REQUEST_TTL = 600;
+let token = null, me = null, pollTimer = null, tickTimer = null, current = null;
 try { token = sessionStorage.getItem("verifier_token"); } catch (e) {}
 
 async function api(path, opts = {}) {
-  const r = await fetch("/api/v1" + path, {
-    ...opts,
-    headers: {"Content-Type": "application/json", ...(token ? {Authorization: "Bearer " + token} : {})}
-  });
+  const r = await fetch("/api/v1" + path, {...opts, headers: {"Content-Type": "application/json", ...(token ? {Authorization: "Bearer " + token} : {})}});
   const body = await r.json().catch(() => ({}));
   if (!r.ok) {
-    if (r.status === 401) logout();
+    if (r.status === 401 && token) logout();
     const d = body.detail;
-    const msg = (d && d.error && d.error.message) || (d && d.message) || (typeof d === "string" ? d : "Request failed (" + r.status + ")");
-    throw new Error(msg);
-
+    throw new Error((d && d.error && d.error.message) || (d && d.message) || (typeof d === "string" ? d : "Request failed (" + r.status + ")"));
   }
   return body;
 }
+const fmt = s => s ? new Date(s).toLocaleString() : "";
+function td(tr, text) { const c = document.createElement("td"); c.textContent = text; tr.appendChild(c); return c; }
+
+function buildFields() {
+  const box = $("fieldList"); box.replaceChildren();
+  FIELDS.forEach(([key, label]) => {
+    const l = document.createElement("label"); l.style.margin = "0"; l.style.color = "var(--text)"; l.textContent = label; l.htmlFor = "f_" + key;
+    const sel = document.createElement("select"); sel.id = "f_" + key;
+    [["required", "Must share"], ["optional", "May share"], ["skip", "Don't ask"]].forEach(([v, t]) => { const o = document.createElement("option"); o.value = v; o.textContent = t; sel.appendChild(o); });
+    box.appendChild(l); box.appendChild(sel);
+  });
+  applyPreset("status");
+}
+function applyPreset(name) { Object.entries(PRESETS[name]).forEach(([k, v]) => { $("f_" + k).value = v; }); }
+document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => applyPreset(b.dataset.preset));
 
 function show(loggedIn) {
   $("loginView").classList.toggle("hidden", loggedIn);
   $("appView").classList.toggle("hidden", !loggedIn);
   $("logout").classList.toggle("hidden", !loggedIn);
+  $("whoami").textContent = loggedIn && me ? "Signed in as " + me : "";
 }
 function logout() {
-  token = null;
+  stopWatching(); token = null; me = null; current = null;
   try { sessionStorage.removeItem("verifier_token"); } catch (e) {}
   show(false);
 }
-function newNonce() {
-  const b = new Uint8Array(12); crypto.getRandomValues(b);
-  $("nonce").value = Array.from(b, x => x.toString(16).padStart(2, "0")).join("");
-  $("resultCard").classList.add("hidden");
+async function start() {
+  try { me = (await api("/auth/me")).username; } catch (e) { return; }
+  show(true); buildFields(); loadHistory();
 }
 
 $("loginBtn").onclick = async () => {
@@ -124,93 +183,106 @@ $("loginBtn").onclick = async () => {
     const r = await api("/auth/login", {method: "POST", body: JSON.stringify({username: $("u").value, password: $("p").value})});
     token = r.access_token;
     try { sessionStorage.setItem("verifier_token", token); } catch (e) {}
-    $("loginMsg").textContent = ""; $("p").value = "";
-    show(true); $("genRequestBtn").click();
+    $("loginMsg").textContent = ""; $("p").value = ""; start();
   } catch (e) { $("loginMsg").textContent = e.message; }
 };
 
-let pollTimer = null;
+function stopWatching() { if (pollTimer) clearInterval(pollTimer); if (tickTimer) clearInterval(tickTimer); pollTimer = tickTimer = null; }
+function setStatus(kind, text) { $("dot").className = "dot" + (kind ? " " + kind : ""); $("statusText").textContent = text; }
 
-function displayResult(r) {
-  const label = {valid: "Valid", revoked: "Revoked", invalid: "Invalid"}[r.status] || r.status;
-  const b = $("badge"); b.textContent = label; b.className = "badge " + r.status;
+function drawQr(text) {
+  try { const q = qrcode(0, "M"); q.addData(text); q.make(); $("qr").innerHTML = q.createSvgTag({cellSize: 4, margin: 0, scalable: true}); }
+  catch (e) { $("qr").textContent = "QR unavailable, use the link below"; }
+}
+
+$("createBtn").onclick = async () => {
+  $("createMsg").textContent = "";
+  const req = [], opt = [];
+  FIELDS.forEach(([k]) => { const v = $("f_" + k).value; if (v === "required") req.push(k); else if (v === "optional") opt.push(k); });
+  if (!req.length) { $("createMsg").textContent = "Pick at least one field the student must share"; return; }
+  try {
+    const r = await api("/presentation-requests", {method: "POST", body: JSON.stringify({
+      client_name: "Campus Verifier", client_id: $("aud").value.trim() || "campus-verifier",
+      purpose: $("purpose").value.trim() || "Verify student enrollment", required_claims: req, optional_claims: opt})});
+    stopWatching();
+    current = {nonce: r.nonce, aud: r.client_id, created: Date.now()};
+    $("resultCard").classList.add("hidden");
+    $("noRequest").classList.add("hidden"); $("requestBox").classList.remove("hidden");
+    $("vpUri").value = r.openid4vp_uri;
+    $("openWallet").href = "http://localhost:3002/?request=" + encodeURIComponent(r.openid4vp_uri);
+    drawQr(r.openid4vp_uri);
+    setStatus("", "Waiting for the student's wallet…");
+    tickTimer = setInterval(tick, 1000); tick();
+    pollTimer = setInterval(poll, 1500);
+  } catch (e) { $("createMsg").textContent = e.message; }
+};
+
+function tick() {
+  if (!current) return;
+  const left = REQUEST_TTL - Math.floor((Date.now() - current.created) / 1000);
+  if (left <= 0) { stopWatching(); setStatus("stop", "This request expired. Create a new one."); $("countdown").textContent = ""; return; }
+  $("countdown").textContent = "Expires in " + Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0");
+}
+async function poll() {
+  if (!current) return;
+  try {
+    const c = await api("/presentation-requests/" + current.nonce);
+    if (c.status === "verified" && c.result) { stopWatching(); $("countdown").textContent = ""; setStatus("done", "Response received"); showResult(c.result); loadHistory(); }
+  } catch (e) { if (/not found|expired/i.test(e.message)) { stopWatching(); setStatus("stop", "This request expired. Create a new one."); } }
+}
+
+function showResult(r) {
+  const label = {valid: "Valid", revoked: "Revoked", invalid: "Not valid"}[r.status] || r.status;
+  const icon = {valid: "✓", revoked: "✕", invalid: "!"}[r.status] || "?";
+  $("banner").className = "banner " + r.status;
+  $("bannerIcon").textContent = icon; $("bannerText").textContent = label;
+  $("bannerSub").textContent = {valid: "The card is genuine, unchanged and belongs to the person who showed it.",
+    revoked: "The college has cancelled this card.", invalid: "This presentation failed the checks below."}[r.status] || "";
   const ul = $("reasons"); ul.replaceChildren();
   (r.reasons || []).forEach(t => { const li = document.createElement("li"); li.textContent = t; ul.appendChild(li); });
   const rows = $("claimRows"); rows.replaceChildren();
-  const entries = r.status === "invalid" ? [] : Object.entries(r.claims || {});
-  entries.forEach(([k, v]) => {
-    const tr = document.createElement("tr");
-    [k, String(v)].forEach(t => { const td = document.createElement("td"); td.textContent = t; tr.appendChild(td); });
-    rows.appendChild(tr);
-  });
+  const technical = ["iat", "nbf", "exp", "_sd_alg"];
+  const entries = r.status === "invalid" ? [] : Object.entries(r.claims || {}).filter(([k]) => !technical.includes(k));
+  entries.forEach(([k, v]) => { const tr = document.createElement("tr"); td(tr, k); td(tr, String(v)); rows.appendChild(tr); });
   $("claimsTable").classList.toggle("hidden", !entries.length);
   $("hiddenNote").textContent = r.status === "invalid" ? "" : r.hidden + " field(s) were not shared by the student.";
-  $("regNote").textContent = r.status === "invalid" ? "" :
-    (r.registered ? "Issued by this campus system." : "Not found in the campus register.");
+  $("regNote").textContent = r.status === "invalid" ? "" : (r.registered ? "Issued by this campus system." : "Not found in the campus register.");
   $("resultCard").classList.remove("hidden");
+  $("resultCard").scrollIntoView({behavior: "smooth", block: "nearest"});
 }
-
-$("newNonce").onclick = () => {
-  if (pollTimer) clearInterval(pollTimer);
-  newNonce();
-};
-
-$("genRequestBtn").onclick = async () => {
-  try {
-    const r = await api("/presentation-requests", {
-      method: "POST",
-      body: JSON.stringify({
-        client_name: "Campus Central Verifier",
-        client_id: $("aud").value.trim() || "campus-verifier",
-        purpose: $("purpose").value.trim() || "Verify student enrollment",
-        required_claims: ["enrollment_status", "valid_until"],
-        optional_claims: ["name", "roll_number", "branch"]
-      })
-    });
-    $("nonce").value = r.nonce;
-    $("vpUri").value = r.openid4vp_uri;
-    $("openWallet").href = "http://localhost:3002/?request=" + encodeURIComponent(r.openid4vp_uri);
-    $("vpReqBox").classList.remove("hidden");
-
-    if (pollTimer) clearInterval(pollTimer);
-    pollTimer = setInterval(async () => {
-      try {
-        const check = await api("/presentation-requests/" + r.nonce);
-        if (check && check.status === "verified" && check.result) {
-          clearInterval(pollTimer);
-          displayResult(check.result);
-        }
-      } catch (e) {}
-    }, 1500);
-  } catch (e) {
-    $("verifyMsg").textContent = "Failed to generate request: " + e.message;
-  }
-};
-
-$("copyVpUri").onclick = async () => {
-  try {
-    await navigator.clipboard.writeText($("vpUri").value);
-    $("copyVpUri").textContent = "Copied!";
-    setTimeout(() => { $("copyVpUri").textContent = "Copy link"; }, 2000);
-  } catch (e) {
-    $("vpUri").select();
-  }
-};
-
 
 $("verifyBtn").onclick = async () => {
   $("verifyMsg").textContent = "";
   const pres = $("pres").value.trim();
   if (!pres) { $("verifyMsg").textContent = "Paste the shared credential first"; return; }
+  if (!current) { $("verifyMsg").textContent = "Create a request first, so the proof can be matched to it"; return; }
   try {
-    const r = await api("/verify", {method: "POST", body: JSON.stringify({presentation: pres, nonce: $("nonce").value, aud: $("aud").value.trim()})});
-    displayResult(r);
+    const r = await api("/verify", {method: "POST", body: JSON.stringify({presentation: pres, nonce: current.nonce, aud: current.aud})});
+    stopWatching(); setStatus("done", "Response received"); showResult(r); loadHistory();
   } catch (e) { $("verifyMsg").textContent = e.message; }
 };
 
+$("copyVpUri").onclick = async () => {
+  try { await navigator.clipboard.writeText($("vpUri").value); $("copyVpUri").textContent = "Copied"; setTimeout(() => $("copyVpUri").textContent = "Copy link", 1800); }
+  catch (e) { $("vpUri").select(); }
+};
 
-$("logout").onclick = logout;
-if (token) { show(true); $("genRequestBtn").click(); } else show(false);
+async function loadHistory() {
+  try {
+    const rows = await api("/verifications");
+    const body = $("histRows"); body.replaceChildren();
+    rows.forEach(h => {
+      const tr = document.createElement("tr"); td(tr, fmt(h.at)); td(tr, h.credential_id);
+      const c = document.createElement("td"); const p = document.createElement("span"); p.className = "pill " + h.status; p.textContent = h.status; c.appendChild(p); tr.appendChild(c);
+      td(tr, h.by); body.appendChild(tr);
+    });
+    $("histMsg").textContent = rows.length ? "" : "No checks yet.";
+  } catch (e) { $("histMsg").textContent = e.message; }
+}
+$("refreshHist").onclick = loadHistory;
+$("logout").onclick = async () => { try { await api("/auth/logout", {method: "POST"}); } catch (e) {} logout(); };
+$("p").addEventListener("keydown", e => { if (e.key === "Enter") $("loginBtn").click(); });
+if (token) start(); else show(false);
 </script>
 </body>
 </html>
