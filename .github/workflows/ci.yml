@@ -2,14 +2,17 @@ name: Continuous Integration & Security Checks
 
 on:
   push:
-    branches: [ "main", "master", "T1/issuer-verifier", "T2/holder-wallet-react" ]
+    branches: [ "main", "master", "T1/issuer-verifier", "T2/holder-wallet-react", "integration/end-to-end" ]
   pull_request:
-    branches: [ "main", "master" ]
+    branches: [ "main", "master", "integration/end-to-end" ]
 
 jobs:
   wallet-checks:
     name: Wallet Build, Lint & Tests
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: wallet
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,16 +28,16 @@ jobs:
           version: 9
 
       - name: Install wallet dependencies
-        run: pnpm --dir wallet install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
 
       - name: Wallet TypeScript Typecheck
-        run: pnpm --dir wallet tsc --noEmit
+        run: pnpm run typecheck
 
       - name: Wallet Production Bundle Build
-        run: pnpm --dir wallet run build
+        run: pnpm run build
 
       - name: Wallet Protocol & Cryptographic Verification Tests
-        run: pnpm --dir wallet test
+        run: pnpm test
 
   backend-checks:
     name: Backend Tests & Cryptographic Verification
