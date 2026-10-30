@@ -317,3 +317,109 @@ class SecureWallet:
 
     def open(self, envelope: Dict[str, Any]) -> Any:
         return self.protocol.decrypt(envelope)
+
+    def _document_manifest(
+        self,
+        fetched_documents: Iterable[Dict[str, Any]],
+        expected_document_ids: Iterable[str],
+    ) -> List[Dict[str, str]]:
+        expected_ids = list(expected_document_ids)
+        if not expected_ids or any(not isinstance(doc_id, str) or not doc_id for doc_id in expected_ids):
+            raise ValueError("Expected document IDs must be a non-empty list of strings.")
+        if len(set(expected_ids)) != len(expected_ids):
+            raise ValueError("Expected document IDs must not contain duplicates.")
+
+        documents_by_id: Dict[str, Dict[str, Any]] = {}
+        for document in fetched_documents:
+            if not isinstance(document, dict):
+                raise ValueError("Every fetched document must be an object.")
+            doc_id = document.get("id")
+            if not isinstance(doc_id, str) or not doc_id:
+                raise ValueError("Every fetched document must have a non-empty string ID.")
+            if doc_id in documents_by_id:
+                raise ValueError(f"Duplicate fetched document ID: {doc_id}.")
+            documents_by_id[doc_id] = document
+
+        expected_set = set(expected_ids)
+        fetched_set = set(documents_by_id)
+        missing = expected_set - fetched_set
+        unexpected = fetched_set - expected_set
+        if missing or unexpected:
+            details = []
+            if missing:
+                details.append(f"missing: {', '.join(sorted(missing))}")
+            if unexpected:
+                details.append(f"unexpected: {', '.join(sorted(unexpected))}")
+            raise ValueError("Document fetch is incomplete or contains unexpected documents (" + "; ".join(details) + ").")
+
+        return [
+            {
+                "id": doc_id,
+                "sha256": hashlib.sha256(_canonical_json(documents_by_id[doc_id])).hexdigest(),
+            }
+            for doc_id in sorted(expected_ids)
+        ]
+
+    def create_document_fetch_receipt(
+        self,
+        fetched_documents: Iterable[Dict[str, Any]],
+        expected_document_ids: Iterable[str],
+    ) -> Dict[str, Any]:
+        if self.handshake.session_key is None or self.protocol.session_key is None:
+            raise ValueError("A verified double-handshake session is required before issuing a fetch receipt.")
+
+        manifest = self._document_manifest(fetched_documents, expected_document_ids)
+        body = {
+            "event": "documents_fetched",
+            "batch_id": secrets.token_hex(16),
+            "timestamp": int(time.time()),
+            "document_count": len(manifest),
+            "documents": manifest,
+            "handshake": {
+                "client_nonce": self.handshake.client_nonce,
+                "server_nonce": self.handshake.server_nonce,
+            },
+        }
+        serialized = _canonical_json(body)
+        return {
+            **body,
+            "digest": hashlib.sha256(serialized).hexdigest(),
+            "signature": hmac.new(self.handshake.session_key, serialized, hashlib.sha256).hexdigest(),
+        }
+
+    def verify_document_fetch_receipt(
+        self,
+        receipt: Dict[str, Any],
+        fetched_documents: Iterable[Dict[str, Any]],
+        expected_document_ids: Iterable[str],
+    ) -> bool:
+        if self.handshake.session_key is None or self.protocol.session_key is None:
+            raise ValueError("A verified double-handshake session is required to verify a fetch receipt.")
+        if not isinstance(receipt, dict):
+            raise ValueError("The fetch receipt must be an object.")
+
+        manifest = self._document_manifest(fetched_documents, expected_document_ids)
+        body = {
+            "event": "documents_fetched",
+            "batch_id": receipt.get("batch_id"),
+            "timestamp": receipt.get("timestamp"),
+            "document_count": len(manifest),
+            "documents": manifest,
+            "handshake": {
+                "client_nonce": self.handshake.client_nonce,
+                "server_nonce": self.handshake.server_nonce,
+            },
+        }
+        if receipt.get("event") != body["event"] or receipt.get("document_count") != len(manifest):
+            raise ValueError("The fetch receipt does not describe the completed document batch.")
+        if not isinstance(body["timestamp"], int) or abs(int(time.time()) - body["timestamp"]) > 300:
+            raise ValueError("The fetch receipt is expired or has an invalid timestamp.")
+
+        serialized = _canonical_json(body)
+        expected_digest = hashlib.sha256(serialized).hexdigest()
+        expected_signature = hmac.new(self.handshake.session_key, serialized, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(str(receipt.get("digest", "")), expected_digest):
+            raise ValueError("The fetch receipt digest does not match the document batch.")
+        if not hmac.compare_digest(str(receipt.get("signature", "")), expected_signature):
+            raise ValueError("The fetch receipt signature is invalid.")
+        return True

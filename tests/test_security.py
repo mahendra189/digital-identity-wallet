@@ -1,6 +1,6 @@
-import json
+import pytest
 
-from digital_identity_wallet.security import DoubleHandshake, LayeredProtocol
+from digital_identity_wallet.security import DoubleHandshake, LayeredProtocol, SecureWallet
 
 
 def test_double_handshake_round_trip() -> None:
@@ -34,8 +34,6 @@ def test_layered_protocol_round_trip() -> None:
 
 
 def test_secure_wallet_protects_payloads() -> None:
-    from digital_identity_wallet.security import SecureWallet
-
     wallet = SecureWallet("shared-wallet-secret", device_id="wallet-01", issuer_id="issuer-01")
     challenge = wallet.start_handshake()
     response = wallet.issuer_response(challenge["nonce"])
@@ -49,3 +47,42 @@ def test_secure_wallet_protects_payloads() -> None:
         assert False, "Replay should have been rejected."
     except ValueError:
         pass
+
+
+def _verified_wallet() -> SecureWallet:
+    wallet = SecureWallet("shared-wallet-secret", device_id="wallet-01", issuer_id="issuer-01")
+    challenge = wallet.start_handshake()
+    response = wallet.issuer_response(challenge["nonce"])
+    wallet.complete_handshake(response, challenge["nonce"])
+    return wallet
+
+
+def test_document_fetch_receipt_requires_complete_batch_and_verified_handshake() -> None:
+    documents = [
+        {"id": "credential-1", "subject": "did:example:alice"},
+        {"id": "credential-2", "subject": "did:example:bob"},
+    ]
+    wallet = SecureWallet("shared-wallet-secret")
+
+    with pytest.raises(ValueError, match="verified double-handshake"):
+        wallet.create_document_fetch_receipt(documents, ["credential-1", "credential-2"])
+
+    wallet = _verified_wallet()
+    with pytest.raises(ValueError, match="incomplete"):
+        wallet.create_document_fetch_receipt(documents[:1], ["credential-1", "credential-2"])
+
+    receipt = wallet.create_document_fetch_receipt(documents, ["credential-1", "credential-2"])
+    assert receipt["event"] == "documents_fetched"
+    assert receipt["document_count"] == 2
+    assert [entry["id"] for entry in receipt["documents"]] == ["credential-1", "credential-2"]
+    assert wallet.verify_document_fetch_receipt(receipt, documents, ["credential-1", "credential-2"])
+
+
+def test_document_fetch_receipt_rejects_tampered_document() -> None:
+    wallet = _verified_wallet()
+    documents = [{"id": "credential-1", "subject": "did:example:alice"}]
+    receipt = wallet.create_document_fetch_receipt(documents, ["credential-1"])
+    changed_documents = [{"id": "credential-1", "subject": "did:example:mallory"}]
+
+    with pytest.raises(ValueError, match="digest"):
+        wallet.verify_document_fetch_receipt(receipt, changed_documents, ["credential-1"])
