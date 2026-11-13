@@ -202,3 +202,23 @@ Verifies:
 - [ ] **Certificate Trust**: Configure `ISSUER_CERT_SHA256` to pin the issuer's root certificate fingerprint.
 - [ ] **CORS**: Restrict `CORS_ORIGINS` to trusted portal domains.
 - [ ] **Status Lists**: Ensure status lists and revocation endpoints have redundancy and low cache TTLs.
+
+## 6. Experimental Python Security Receipt Helper
+
+The root-level `digital_identity_wallet` Python package provides a standalone security helper with a verified handshake, layered payload encryption, and signed receipts for completed document batches. A fetch receipt is created only after the caller supplies the expected document IDs and all matching documents; it records document hashes rather than document contents.
+
+```python
+from digital_identity_wallet.security import SecureWallet
+
+wallet = SecureWallet("shared-wallet-secret", device_id="wallet-01", issuer_id="issuer-01")
+challenge = wallet.start_handshake()
+response = wallet.issuer_response(challenge["nonce"])
+wallet.complete_handshake(response, challenge["nonce"])
+
+expected_ids = ["credential-1"]
+documents = [{"id": "credential-1", "claims": {"name": "Alice"}}]
+receipt = wallet.create_document_fetch_receipt(documents, expected_ids)
+assert wallet.verify_document_fetch_receipt(receipt, documents, expected_ids)
+```
+
+This helper is not yet integrated with the React wallet's remote document-fetch flow; the caller must provide the expected IDs and fetched documents. Run its tests from the repository root with `python -m pytest`.
