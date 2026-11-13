@@ -1,0 +1,11 @@
+{
+  "iss": "${_issuer}",
+  "vct": "CampusID",
+  "cnf": { "kid": "${_holderId}" },
+  "credential_id": "${credential_id}",
+  "name": "${name}",
+  "roll_number": "${roll_number}",
+  "branch": "${branch}",
+  "enrollment_status": "${enrollment_status}",
+  "valid_until": "${valid_until}"
+}

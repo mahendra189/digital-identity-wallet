@@ -1,0 +1,64 @@
+name: Continuous Integration & Security Checks
+
+on:
+  push:
+    branches: [ "main", "master", "T1/issuer-verifier", "T2/holder-wallet-react" ]
+  pull_request:
+    branches: [ "main", "master" ]
+
+jobs:
+  wallet-checks:
+    name: Wallet Build, Lint & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install wallet dependencies
+        run: pnpm --dir wallet install --frozen-lockfile
+
+      - name: Wallet TypeScript Typecheck
+        run: pnpm --dir wallet tsc --noEmit
+
+      - name: Wallet Production Bundle Build
+        run: pnpm --dir wallet run build
+
+      - name: Wallet Protocol & Cryptographic Verification Tests
+        run: pnpm --dir wallet test
+
+  backend-checks:
+    name: Backend Tests & Cryptographic Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run Backend Pytest Suite
+        env:
+          ENVIRONMENT: test
+          DATABASE_URL: sqlite+aiosqlite:///./ci_test.db
+          CERTIFY_MOCK: "true"
+        run: |
+          cd backend
+          pytest -v
